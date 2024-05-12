@@ -1,4 +1,4 @@
-package rosedb
+package disk
 
 import (
 	"encoding/binary"
@@ -17,7 +17,7 @@ const (
 // type batchId keySize valueSize expire
 //
 //	1  +  10  +   5   +   5   +    10  = 31
-const maxLogRecordHeaderSize = binary.MaxVarintLen32*2 + binary.MaxVarintLen64*2 + 1
+const MaxLogRecordHeaderSize = binary.MaxVarintLen32*2 + binary.MaxVarintLen64*2 + 1
 
 // LogRecord 用来存储在batch的pendingWrites中
 type LogRecord struct {
@@ -36,9 +36,9 @@ func (lr *LogRecord) IsExpired(now int64) bool {
 // IndexRecord key的index记录
 // 只使用来重建index
 type IndexRecord struct {
-	key        []byte
-	recordType LogRecordType
-	position   *wal.ChunkPosition
+	Key        []byte
+	RecordType LogRecordType
+	Position   *wal.ChunkPosition
 }
 
 // +-------------+-------------+-------------+--------------+---------------+---------+--------------+
@@ -49,7 +49,7 @@ type IndexRecord struct {
 //
 // index的值表示了当前已经在header切片中编码了多少个字节。每当编码整数时编码后的字节会追加到header切片的末尾
 // 最后写入buf并返回buf.Bytes()
-func encodeLogRecord(logRecord *LogRecord, header []byte, buf *bytebufferpool.ByteBuffer) []byte {
+func EncodeLogRecord(logRecord *LogRecord, header []byte, buf *bytebufferpool.ByteBuffer) []byte {
 	header[0] = logRecord.Type
 	var index = 1
 	// batch id
@@ -70,7 +70,7 @@ func encodeLogRecord(logRecord *LogRecord, header []byte, buf *bytebufferpool.By
 }
 
 // decodeLogRecord 从给定的buf解码LogRecord
-func decodeLogRecord(buf []byte) *LogRecord {
+func DecodeLogRecord(buf []byte) *LogRecord {
 	recordType := buf[0]
 	var index uint32 = 1
 	// batch id
@@ -96,7 +96,7 @@ func decodeLogRecord(buf []byte) *LogRecord {
 		BatchId: batchId, Type: recordType}
 }
 
-func encodeHintRecord(key []byte, pos *wal.ChunkPosition) []byte {
+func EncodeHintRecord(key []byte, pos *wal.ChunkPosition) []byte {
 	// SegmentId BlockNumber ChunkOffset ChunkSize
 	//    5          5           10          5      =    25
 	// see binary.MaxVarintLen64 and binary.MaxVarintLen32
@@ -119,7 +119,7 @@ func encodeHintRecord(key []byte, pos *wal.ChunkPosition) []byte {
 	return result
 }
 
-func decodeHintRecord(buf []byte) ([]byte, *wal.ChunkPosition) {
+func DecodeHintRecord(buf []byte) ([]byte, *wal.ChunkPosition) {
 	var idx = 0
 	// SegmentId
 	segmentId, n := binary.Uvarint(buf[idx:])
@@ -144,7 +144,7 @@ func decodeHintRecord(buf []byte) ([]byte, *wal.ChunkPosition) {
 	}
 }
 
-func encodeMergeFinRecord(segmentId wal.SegmentID) []byte {
+func EncodeMergeFinRecord(segmentId wal.SegmentID) []byte {
 	buf := make([]byte, 4)
 	binary.LittleEndian.PutUint32(buf, segmentId)
 	return buf

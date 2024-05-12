@@ -2,8 +2,9 @@ package test
 
 import (
 	"fmt"
-	"github.com/rosedblabs/rosedb/v2"
-	"github.com/rosedblabs/rosedb/v2/utils"
+	"github.com/rosedblabs/rosedb/v2/common/constrants"
+	"github.com/rosedblabs/rosedb/v2/common/utils"
+	"github.com/rosedblabs/rosedb/v2/execution"
 	"log"
 	"os"
 	"testing"
@@ -11,13 +12,13 @@ import (
 )
 
 func TestBasic(t *testing.T) {
-	options := rosedb.DefaultOptions
+	options := constrants.DefaultOptions
 	options.DirPath = "/tmp/jdb_basic"
 	defer func() {
 		_ = os.RemoveAll(options.DirPath)
 	}()
 
-	db, err := rosedb.Open(options)
+	db, err := execution.Open(options)
 	if err != nil {
 		panic(err)
 	}
@@ -42,11 +43,14 @@ func TestBasic(t *testing.T) {
 	}
 }
 
-func TestBatch(t *testing.T) {
-	options := rosedb.DefaultOptions
-	options.DirPath = "/tmp/rosedb_batch"
+func TestLock(t *testing.T) {
+	options := constrants.DefaultOptions
+	options.DirPath = "/tmp/jdb_basic"
+	defer func() {
+		_ = os.RemoveAll(options.DirPath)
+	}()
 
-	db, err := rosedb.Open(options)
+	db, err := execution.Open(options)
 	if err != nil {
 		panic(err)
 	}
@@ -54,23 +58,52 @@ func TestBatch(t *testing.T) {
 		_ = db.Close()
 	}()
 
-	batch := db.NewBatch(rosedb.DefaultBatchOptions)
+	err = db.ConcurrentPut([]byte("name"), []byte("jdb"))
+	if err != nil {
+		panic(err)
+	}
 
-	_ = batch.Put([]byte("name"), []byte("rosedb"))
-
-	val, _ := batch.Get([]byte("name"))
+	val, err := db.ConcurrentGet([]byte("name"))
+	if err != nil {
+		panic(err)
+	}
 	println(string(val))
 
-	_ = batch.Delete([]byte("name"))
+	err = db.ConcurrentDelete([]byte("name"))
+	if err != nil {
+		panic(err)
+	}
+}
+
+func TestBatch(t *testing.T) {
+	options := constrants.DefaultOptions
+	options.DirPath = "/tmp/rosedb_batch"
+
+	db, err := execution.Open(options)
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		_ = db.Close()
+	}()
+
+	batch := db.NewExecutor(constrants.DefaultBatchOptions)
+
+	_ = batch.ConcurrentPut([]byte("name"), []byte("rosedb"), db.LockManager)
+
+	val, _ := batch.ConcurrentGet([]byte("name"), db.LockManager)
+	println(string(val))
+
+	_ = batch.ConcurrentDelete([]byte("name"), db.LockManager)
 
 	_ = batch.Commit()
 }
 
 func TestMerge(t *testing.T) {
-	options := rosedb.DefaultOptions
+	options := constrants.DefaultOptions
 	options.DirPath = "/tmp/rosedb_merge"
 
-	db, err := rosedb.Open(options)
+	db, err := execution.Open(options)
 	if err != nil {
 		panic(err)
 	}
@@ -79,22 +112,22 @@ func TestMerge(t *testing.T) {
 	}()
 
 	for i := 0; i < 100000; i++ {
-		_ = db.Put([]byte(utils.GetTestKey(i)), utils.RandomValue(128))
+		_ = db.ConcurrentPut([]byte(utils.GetTestKey(i)), utils.RandomValue(128))
 	}
 
 	for i := 0; i < 100000/2; i++ {
-		_ = db.Delete([]byte(utils.GetTestKey(i)))
+		_ = db.ConcurrentDelete([]byte(utils.GetTestKey(i)))
 	}
 
 	_ = db.Merge(true)
 }
 
 func TestWatch(t *testing.T) {
-	options := rosedb.DefaultOptions
+	options := constrants.DefaultOptions
 	options.DirPath = "/tmp/rosedb_watch"
 	options.WatchQueueSize = 1000
 
-	db, err := rosedb.Open(options)
+	db, err := execution.Open(options)
 	if err != nil {
 		panic(err)
 	}
@@ -110,7 +143,7 @@ func TestWatch(t *testing.T) {
 		for {
 			event := <-eventCh
 			if event == nil {
-				fmt.Println("The db is closed, so the watch channel is closed.")
+				fmt.Println("The db is Close, so the watch channel is Close.")
 				return
 			}
 			fmt.Printf("Get a new event: key%s \n", event.Key)
@@ -118,21 +151,21 @@ func TestWatch(t *testing.T) {
 	}()
 
 	for i := 0; i < 10; i++ {
-		_ = db.Put(utils.GetTestKey(i), utils.RandomValue(64))
+		_ = db.ConcurrentPut(utils.GetTestKey(i), utils.RandomValue(64))
 	}
 
 	for i := 0; i < 10/2; i++ {
-		_ = db.Delete(utils.GetTestKey(i))
+		_ = db.ConcurrentDelete(utils.GetTestKey(i))
 	}
 
 	time.Sleep(1 * time.Second)
 }
 
 func TestTTL(t *testing.T) {
-	options := rosedb.DefaultOptions
+	options := constrants.DefaultOptions
 	options.DirPath = "/tmp/rosedb_ttl"
 
-	db, err := rosedb.Open(options)
+	db, err := execution.Open(options)
 	if err != nil {
 		panic(err)
 	}
@@ -151,7 +184,7 @@ func TestTTL(t *testing.T) {
 	}
 	println(ttl.String())
 
-	_ = db.Put([]byte("name2"), []byte("rosedb2"))
+	_ = db.ConcurrentPut([]byte("name2"), []byte("rosedb2"))
 
 	err = db.Expire([]byte("name2"), time.Second*2)
 	if err != nil {
@@ -165,10 +198,10 @@ func TestTTL(t *testing.T) {
 }
 
 func TestIterate(t *testing.T) {
-	options := rosedb.DefaultOptions
+	options := constrants.DefaultOptions
 	options.DirPath = "/tmp/rosedb_iterate"
 
-	db, err := rosedb.Open(options)
+	db, err := execution.Open(options)
 	if err != nil {
 		panic(err)
 	}
@@ -176,11 +209,11 @@ func TestIterate(t *testing.T) {
 		_ = db.Close()
 	}()
 
-	_ = db.Put([]byte("key13"), []byte("value13"))
-	_ = db.Put([]byte("key11"), []byte("value11"))
-	_ = db.Put([]byte("key35"), []byte("value35"))
-	_ = db.Put([]byte("key27"), []byte("value27"))
-	_ = db.Put([]byte("key41"), []byte("value41"))
+	_ = db.ConcurrentPut([]byte("key13"), []byte("value13"))
+	_ = db.ConcurrentPut([]byte("key11"), []byte("value11"))
+	_ = db.ConcurrentPut([]byte("key35"), []byte("value35"))
+	_ = db.ConcurrentPut([]byte("key27"), []byte("value27"))
+	_ = db.ConcurrentPut([]byte("key41"), []byte("value41"))
 
 	db.AscendKeys(nil, true, func(k []byte) (bool, error) {
 		fmt.Println("key = ", string(k))

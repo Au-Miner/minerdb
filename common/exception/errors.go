@@ -1,4 +1,4 @@
-package rosedb
+package exception
 
 import "errors"
 
@@ -9,7 +9,9 @@ var (
 	ErrReadOnlyBatch   = errors.New("the batch is read only")
 	ErrBatchCommitted  = errors.New("the batch is committed")
 	ErrBatchRollbacked = errors.New("the batch is rollbacked")
-	ErrDBClosed        = errors.New("the database is closed")
+	ErrDBClose         = errors.New("the database is Close")
 	ErrMergeRunning    = errors.New("the merge operation is running")
 	ErrWatchDisabled   = errors.New("the watch is disabled")
+
+	ErrBatchAborted = errors.New("the watch is disabled")
 )

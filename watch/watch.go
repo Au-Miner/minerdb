@@ -1,4 +1,4 @@
-package rosedb
+package watch
 
 import (
 	"sync"
@@ -36,7 +36,7 @@ func NewWatcher(capacity uint64) *Watcher {
 	}
 }
 
-func (w *Watcher) putEvent(e *Event) {
+func (w *Watcher) PutEvent(e *Event) {
 	w.mu.Lock()
 	w.queue.push(e)
 	if w.queue.isFull() {
@@ -54,7 +54,7 @@ func (w *Watcher) getEvent() *Event {
 	return w.queue.pop()
 }
 
-func (w *Watcher) sendEvent(c chan *Event) {
+func (w *Watcher) SendEvent(c chan *Event) {
 	for {
 		event := w.getEvent()
 		if event == nil {

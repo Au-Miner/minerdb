@@ -1,8 +1,14 @@
-package rosedb
+package execution
 
 import (
 	"fmt"
-	"github.com/rosedblabs/rosedb/v2/utils"
+	"github.com/rosedblabs/rosedb/v2/common/constrants"
+	"github.com/rosedblabs/rosedb/v2/common/exception"
+	"github.com/rosedblabs/rosedb/v2/common/utils"
+	"github.com/rosedblabs/rosedb/v2/concurrency"
+	"github.com/rosedblabs/rosedb/v2/storage/disk"
+	"github.com/rosedblabs/rosedb/v2/storage/index"
+	"github.com/rosedblabs/rosedb/v2/watch"
 	"io"
 	"os"
 	"path/filepath"
@@ -13,7 +19,6 @@ import (
 	"github.com/bwmarrin/snowflake"
 	"github.com/gofrs/flock"
 	"github.com/robfig/cron/v3"
-	"github.com/rosedblabs/rosedb/v2/index"
 	"github.com/rosedblabs/wal"
 )
 
@@ -28,17 +33,18 @@ type DB struct {
 	dataFiles     *wal.WAL      // 所有bitcask日志文件
 	hintFile      *wal.WAL      // merge期间所有older data file统计的hint，用于快速恢复index
 	index         index.Indexer // key->wal.ChunkPosition，pos是wal写入后返回的信息
-	options       Options
+	options       constrants.Options
 	fileLock      *flock.Flock
 	mu            sync.RWMutex
-	closed        bool
+	isClose       bool
 	mergeRunning  uint32
-	batchPool     sync.Pool
+	executorPool  sync.Pool
 	recordPool    sync.Pool
 	encodeHeader  []byte
-	watchCh       chan *Event
-	watcher       *Watcher
-	cronScheduler *cron.Cron // 自动merge
+	watchCh       chan *watch.Event
+	watcher       *watch.Watcher
+	cronScheduler *cron.Cron               // 自动merge
+	LockManager   *concurrency.LockManager // 锁管理
 }
 
 // Stat 数据库统计信息
@@ -47,8 +53,28 @@ type Stat struct {
 	DiskSize int64
 }
 
+// NewExecutor 通过db.NewExecutor来新建executor
+func (db *DB) NewExecutor(options constrants.BatchOptions) *CommonExecutor {
+	commonExecutor := &CommonExecutor{
+		db:    db,
+		batch: *disk.NewBatch(options),
+	}
+	commonExecutor.lock()
+	return commonExecutor
+}
+
+func NewExecutor() interface{} {
+	return &CommonExecutor{
+		batch: *disk.NewBatch(constrants.DefaultBatchOptions),
+	}
+}
+
+func NewRecord() interface{} {
+	return &disk.LogRecord{}
+}
+
 // 根据options来创建db
-func Open(options Options) (*DB, error) {
+func Open(options constrants.Options) (*DB, error) {
 	// 创建文件夹
 	if _, err := os.Stat(options.DirPath); err != nil {
 		if err := os.MkdirAll(options.DirPath, os.ModePerm); err != nil {
@@ -62,7 +88,7 @@ func Open(options Options) (*DB, error) {
 		return nil, err
 	}
 	if !hold {
-		return nil, ErrDatabaseIsUsing
+		return nil, exception.ErrDatabaseIsUsing
 	}
 	// 读取merge后的文件(所有dirPath-merge文件（doMerge之后的mergeDB中的数据）会被移动到dirPath中)
 	if err = loadMergeFiles(options.DirPath); err != nil {
@@ -73,9 +99,10 @@ func Open(options Options) (*DB, error) {
 		index:        index.NewIndexer(),
 		options:      options,
 		fileLock:     fileLock,
-		batchPool:    sync.Pool{New: newBatch},
-		recordPool:   sync.Pool{New: newRecord},
-		encodeHeader: make([]byte, maxLogRecordHeaderSize),
+		executorPool: sync.Pool{New: NewExecutor},
+		recordPool:   sync.Pool{New: NewRecord},
+		encodeHeader: make([]byte, disk.MaxLogRecordHeaderSize),
+		LockManager:  concurrency.NewLockManager(),
 	}
 	// 读取wal文件
 	if db.dataFiles, err = db.openWalFiles(); err != nil {
@@ -87,10 +114,10 @@ func Open(options Options) (*DB, error) {
 	}
 	// 开启watch
 	if options.WatchQueueSize > 0 {
-		db.watchCh = make(chan *Event, 100)
-		db.watcher = NewWatcher(options.WatchQueueSize)
+		db.watchCh = make(chan *watch.Event, 100)
+		db.watcher = watch.NewWatcher(options.WatchQueueSize)
 		// 开启goroutine以同步事件信息
-		go db.watcher.sendEvent(db.watchCh)
+		go db.watcher.SendEvent(db.watchCh)
 	}
 	// 开启自动merge task
 	if len(options.AutoMergeCronExpr) > 0 {
@@ -160,7 +187,7 @@ func (db *DB) Close() error {
 	if db.cronScheduler != nil {
 		db.cronScheduler.Stop()
 	}
-	db.closed = true
+	db.isClose = true
 	return nil
 }
 
@@ -201,108 +228,155 @@ func (db *DB) Stat() *Stat {
 	}
 }
 
-// Put 调用db.Put操作，只会将一个Put操作放入batch中，并commit掉
+// Put 调用db.Put操作，只会将一个Put操作放入commonExecutorh中，并commit掉
 func (db *DB) Put(key []byte, value []byte) error {
-	batch := db.batchPool.Get().(*Batch)
+	commonExecutor := db.executorPool.Get().(*CommonExecutor)
 	defer func() {
 		// 最后要reset
-		batch.reset()
-		db.batchPool.Put(batch)
+		commonExecutor.reset()
+		db.executorPool.Put(commonExecutor)
 	}()
 	// 设置sync为false，因为数据会写入WAL，WAL文件会根据DB选项同步到磁盘
-	batch.init(false, false, db)
-	if err := batch.Put(key, value); err != nil {
-		_ = batch.Rollback()
+	commonExecutor.init(false, false, db)
+	if err := commonExecutor.Put(key, value); err != nil {
+		_ = commonExecutor.Rollback()
 		return err
 	}
-	return batch.Commit()
+	return commonExecutor.Commit()
+}
+
+func (db *DB) ConcurrentPut(key []byte, value []byte) error {
+	commonExecutor := db.executorPool.Get().(*CommonExecutor)
+	defer func() {
+		// 最后要reset
+		commonExecutor.reset()
+		db.executorPool.Put(commonExecutor)
+	}()
+	// 设置sync为false，因为数据会写入WAL，WAL文件会根据DB选项同步到磁盘
+	commonExecutor.init(false, false, db)
+	if err := commonExecutor.ConcurrentPut(key, value, db.LockManager); err != nil {
+		_ = commonExecutor.ConcurrentRollback(key, db.LockManager)
+		return err
+	}
+	return commonExecutor.ConcurrentCommit(key, db.LockManager)
 }
 
 // PutWithTTL kv对携带ttl
 func (db *DB) PutWithTTL(key []byte, value []byte, ttl time.Duration) error {
-	batch := db.batchPool.Get().(*Batch)
+	commonExecutor := db.executorPool.Get().(*CommonExecutor)
 	defer func() {
-		batch.reset()
-		db.batchPool.Put(batch)
+		commonExecutor.reset()
+		db.executorPool.Put(commonExecutor)
 	}()
-	batch.init(false, false, db)
-	if err := batch.PutWithTTL(key, value, ttl); err != nil {
-		_ = batch.Rollback()
+	commonExecutor.init(false, false, db)
+	if err := commonExecutor.PutWithTTL(key, value, ttl); err != nil {
+		commonExecutor.Rollback()
 		return err
 	}
-	return batch.Commit()
+	return commonExecutor.Commit()
 }
 
 // Get get value
 func (db *DB) Get(key []byte) ([]byte, error) {
-	batch := db.batchPool.Get().(*Batch)
-	batch.init(true, false, db)
+	commonExecutor := db.executorPool.Get().(*CommonExecutor)
+	commonExecutor.init(true, false, db)
 	defer func() {
-		_ = batch.Commit()
-		batch.reset()
-		db.batchPool.Put(batch)
+		_ = commonExecutor.Commit()
+		commonExecutor.reset()
+		db.executorPool.Put(commonExecutor)
 	}()
-	return batch.Get(key)
+	return commonExecutor.Get(key)
+}
+
+func (db *DB) ConcurrentGet(key []byte) ([]byte, error) {
+	commonExecutor := db.executorPool.Get().(*CommonExecutor)
+	commonExecutor.init(true, false, db)
+	defer func() {
+		commonExecutor.reset()
+		db.executorPool.Put(commonExecutor)
+	}()
+	if val, err := commonExecutor.ConcurrentGet(key, db.LockManager); err != nil {
+		commonExecutor.ConcurrentRollback(key, db.LockManager)
+		return nil, err
+	} else {
+		_ = commonExecutor.ConcurrentCommit(key, db.LockManager)
+		return val, nil
+	}
 }
 
 // Delete 删除特定的key
 func (db *DB) Delete(key []byte) error {
-	batch := db.batchPool.Get().(*Batch)
+	commonExecutor := db.executorPool.Get().(*CommonExecutor)
 	defer func() {
-		batch.reset()
-		db.batchPool.Put(batch)
+		commonExecutor.reset()
+		db.executorPool.Put(commonExecutor)
 	}()
 	// 同put，设置sync为false
-	batch.init(false, false, db)
-	if err := batch.Delete(key); err != nil {
-		_ = batch.Rollback()
+	commonExecutor.init(false, false, db)
+	if err := commonExecutor.Delete(key); err != nil {
+		_ = commonExecutor.Rollback()
 		return err
 	}
-	return batch.Commit()
+	return commonExecutor.Commit()
+}
+
+func (db *DB) ConcurrentDelete(key []byte) error {
+	commonExecutor := db.executorPool.Get().(*CommonExecutor)
+	defer func() {
+		commonExecutor.reset()
+		db.executorPool.Put(commonExecutor)
+	}()
+	// 同put，设置sync为false
+	commonExecutor.init(false, false, db)
+	if err := commonExecutor.ConcurrentDelete(key, db.LockManager); err != nil {
+		_ = commonExecutor.ConcurrentRollback(key, db.LockManager)
+		return err
+	}
+	return commonExecutor.ConcurrentCommit(key, db.LockManager)
 }
 
 // Exist 检查是否存在key
 func (db *DB) Exist(key []byte) (bool, error) {
-	batch := db.batchPool.Get().(*Batch)
-	batch.init(true, false, db)
+	commonExecutor := db.executorPool.Get().(*CommonExecutor)
+	commonExecutor.init(true, false, db)
 	defer func() {
-		_ = batch.Commit()
-		batch.reset()
-		db.batchPool.Put(batch)
+		_ = commonExecutor.Commit()
+		commonExecutor.reset()
+		db.executorPool.Put(commonExecutor)
 	}()
-	return batch.Exist(key)
+	return commonExecutor.Exist(key)
 }
 
 // Expire 手动设置key对应的ttl，和put、PutWithTTL类似
 func (db *DB) Expire(key []byte, ttl time.Duration) error {
-	batch := db.batchPool.Get().(*Batch)
+	commonExecutor := db.executorPool.Get().(*CommonExecutor)
 	defer func() {
-		batch.reset()
-		db.batchPool.Put(batch)
+		commonExecutor.reset()
+		db.executorPool.Put(commonExecutor)
 	}()
-	batch.init(false, false, db)
-	if err := batch.Expire(key, ttl); err != nil {
-		_ = batch.Rollback()
+	commonExecutor.init(false, false, db)
+	if err := commonExecutor.Expire(key, ttl); err != nil {
+		_ = commonExecutor.Rollback()
 		return err
 	}
-	return batch.Commit()
+	return commonExecutor.Commit()
 }
 
 // TTL 获取key的ttl
 func (db *DB) TTL(key []byte) (time.Duration, error) {
-	batch := db.batchPool.Get().(*Batch)
-	batch.init(true, false, db)
+	commonExecutor := db.executorPool.Get().(*CommonExecutor)
+	commonExecutor.init(true, false, db)
 	defer func() {
-		_ = batch.Commit()
-		batch.reset()
-		db.batchPool.Put(batch)
+		_ = commonExecutor.Commit()
+		commonExecutor.reset()
+		db.executorPool.Put(commonExecutor)
 	}()
-	return batch.TTL(key)
+	return commonExecutor.TTL(key)
 }
 
-func (db *DB) Watch() (<-chan *Event, error) {
+func (db *DB) Watch() (<-chan *watch.Event, error) {
 	if db.options.WatchQueueSize <= 0 {
-		return nil, ErrWatchDisabled
+		return nil, exception.ErrWatchDisabled
 	}
 	return db.watchCh, nil
 }
@@ -470,9 +544,9 @@ func (db *DB) DescendKeys(pattern []byte, filterExpired bool, handleFn func(k []
 }
 
 func (db *DB) checkValue(chunk []byte) []byte {
-	record := decodeLogRecord(chunk)
+	record := disk.DecodeLogRecord(chunk)
 	now := time.Now().UnixNano()
-	if record.Type != LogRecordDeleted && !record.IsExpired(now) {
+	if record.Type != disk.LogRecordDeleted && !record.IsExpired(now) {
 		return record.Value
 	}
 	return nil
@@ -485,7 +559,7 @@ func (db *DB) loadIndexFromWAL() error {
 	if err != nil {
 		return err
 	}
-	indexRecords := make(map[uint64][]*IndexRecord)
+	indexRecords := make(map[uint64][]*disk.IndexRecord)
 	now := time.Now().UnixNano()
 	// 创建reader
 	reader := db.dataFiles.NewReader()
@@ -502,24 +576,24 @@ func (db *DB) loadIndexFromWAL() error {
 			}
 			return err
 		}
-		record := decodeLogRecord(chunk)
+		record := disk.DecodeLogRecord(chunk)
 
 		// 对于activeSegments中只有遇到LogRecordBatchFinished才会开始更新index
-		if record.Type == LogRecordBatchFinished {
+		if record.Type == disk.LogRecordBatchFinished {
 			batchId, err := snowflake.ParseBytes(record.Key)
 			if err != nil {
 				return err
 			}
 			for _, idxRecord := range indexRecords[uint64(batchId)] {
-				if idxRecord.recordType == LogRecordNormal {
-					db.index.Put(idxRecord.key, idxRecord.position)
+				if idxRecord.RecordType == disk.LogRecordNormal {
+					db.index.Put(idxRecord.Key, idxRecord.Position)
 				}
-				if idxRecord.recordType == LogRecordDeleted {
-					db.index.Delete(idxRecord.key)
+				if idxRecord.RecordType == disk.LogRecordDeleted {
+					db.index.Delete(idxRecord.Key)
 				}
 			}
 			delete(indexRecords, uint64(batchId))
-		} else if record.Type == LogRecordNormal && record.BatchId == mergeFinishedBatchID {
+		} else if record.Type == disk.LogRecordNormal && record.BatchId == mergeFinishedBatchID {
 			// 如果是LogRecordNormal且batchId为mergeFinishedBatchID，说明是merge后的数据，直接放入即可
 			// 因为只处理>mergeFinSegmentId的segment，一般不会走该if
 			fmt.Println("真的走了！！！！！")
@@ -531,10 +605,10 @@ func (db *DB) loadIndexFromWAL() error {
 			}
 			// 先放到indexRecords中
 			indexRecords[record.BatchId] = append(indexRecords[record.BatchId],
-				&IndexRecord{
-					key:        record.Key,
-					recordType: record.Type,
-					position:   position,
+				&disk.IndexRecord{
+					Key:        record.Key,
+					RecordType: record.Type,
+					Position:   position,
 				})
 		}
 	}

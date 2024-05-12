@@ -1,4 +1,4 @@
-package rosedb
+package constrants
 
 import "os"
 

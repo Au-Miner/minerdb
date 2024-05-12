@@ -1,8 +1,12 @@
-package rosedb
+package execution
 
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/rosedblabs/rosedb/v2/common/constrants"
+	"github.com/rosedblabs/rosedb/v2/common/exception"
+	"github.com/rosedblabs/rosedb/v2/storage/disk"
+	"github.com/rosedblabs/rosedb/v2/storage/index"
 	"io"
 	"math"
 	"os"
@@ -10,7 +14,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/rosedblabs/rosedb/v2/index"
 	"github.com/rosedblabs/wal"
 	"github.com/valyala/bytebufferpool"
 )
@@ -57,9 +60,9 @@ func (db *DB) Merge(reopenAfterDone bool) error {
 func (db *DB) doMerge() error {
 	db.mu.Lock()
 	// 检查是否database已关、data files为空、merge操作正在进行
-	if db.closed {
+	if db.isClose {
 		db.mu.Unlock()
-		return ErrDBClosed
+		return exception.ErrDBClose
 	}
 	if db.dataFiles.IsEmpty() {
 		db.mu.Unlock()
@@ -67,7 +70,7 @@ func (db *DB) doMerge() error {
 	}
 	if atomic.LoadUint32(&db.mergeRunning) == 1 {
 		db.mu.Unlock()
-		return ErrMergeRunning
+		return exception.ErrMergeRunning
 	}
 	// 原子性，设置mergeRunning为1
 	atomic.StoreUint32(&db.mergeRunning, 1)
@@ -105,9 +108,9 @@ func (db *DB) doMerge() error {
 			}
 			return err
 		}
-		record := decodeLogRecord(chunk)
+		record := disk.DecodeLogRecord(chunk)
 		// 只处理LogRecordNormal, 忽略LogRecordDeleted和LogRecordBatchFinished
-		if record.Type == LogRecordNormal && (record.Expire == 0 || record.Expire > now) {
+		if record.Type == disk.LogRecordNormal && (record.Expire == 0 || record.Expire > now) {
 			db.mu.RLock()
 			indexPos := db.index.Get(record.Key)
 			db.mu.RUnlock()
@@ -115,11 +118,11 @@ func (db *DB) doMerge() error {
 				// 清空record的batchId为0
 				record.BatchId = mergeFinishedBatchID
 				// mergeDB只用来存储merge后的数据，不会用来读写操作，所以不需要更新index
-				newPosition, err := mergeDB.dataFiles.Write(encodeLogRecord(record, mergeDB.encodeHeader, buf))
+				newPosition, err := mergeDB.dataFiles.Write(disk.EncodeLogRecord(record, mergeDB.encodeHeader, buf))
 				if err != nil {
 					return err
 				}
-				_, err = mergeDB.hintFile.Write(encodeHintRecord(record.Key, newPosition))
+				_, err = mergeDB.hintFile.Write(disk.EncodeHintRecord(record.Key, newPosition))
 				if err != nil {
 					return err
 				}
@@ -132,7 +135,7 @@ func (db *DB) doMerge() error {
 	if err != nil {
 		return err
 	}
-	_, err = mergeFinFile.Write(encodeMergeFinRecord(prevActiveSegId))
+	_, err = mergeFinFile.Write(disk.EncodeMergeFinRecord(prevActiveSegId))
 	if err != nil {
 		return err
 	}
@@ -182,7 +185,7 @@ func mergeDirPath(dirPath string) string {
 func (db *DB) openMergeFinishedFile() (*wal.WAL, error) {
 	return wal.Open(wal.Options{
 		DirPath:        db.options.DirPath,
-		SegmentSize:    GB,
+		SegmentSize:    constrants.GB,
 		SegmentFileExt: mergeFinNameSuffix,
 		Sync:           false,
 		BytesPerSync:   0,
@@ -281,7 +284,7 @@ func (db *DB) loadIndexFromHintFile() error {
 		DirPath:        db.options.DirPath,
 		SegmentSize:    math.MaxInt64,
 		SegmentFileExt: hintFileNameSuffix,
-		BlockCache:     32 * KB * 10,
+		BlockCache:     32 * constrants.KB * 10,
 	})
 	if err != nil {
 		return err
@@ -300,7 +303,7 @@ func (db *DB) loadIndexFromHintFile() error {
 			}
 			return err
 		}
-		key, position := decodeHintRecord(chunk)
+		key, position := disk.DecodeHintRecord(chunk)
 		db.index.Put(key, position)
 	}
 	return nil
