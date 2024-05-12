@@ -2,10 +2,10 @@ package index
 
 import (
 	"bytes"
+	"jdb/storage/wal"
 	"sync"
 
 	"github.com/google/btree"
-	"github.com/rosedblabs/wal"
 )
 
 // MemoryBTree 基于内存的btree实现

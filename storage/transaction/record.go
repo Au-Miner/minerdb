@@ -1,9 +1,9 @@
-package disk
+package transaction
 
 import (
 	"encoding/binary"
-	"github.com/rosedblabs/wal"
 	"github.com/valyala/bytebufferpool"
+	"jdb/storage/wal"
 )
 
 type LogRecordType = byte

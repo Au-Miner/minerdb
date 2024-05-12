@@ -2,9 +2,9 @@ package concurrency
 
 import (
 	"github.com/bwmarrin/snowflake"
-	"github.com/rosedblabs/rosedb/v2/common/exception"
-	"github.com/rosedblabs/rosedb/v2/common/utils"
-	"github.com/rosedblabs/rosedb/v2/storage/disk"
+	"jdb/common/exception"
+	"jdb/common/utils"
+	"jdb/storage/transaction"
 	"sync"
 )
 
@@ -54,7 +54,7 @@ func NewLockManager() *LockManager {
 	}
 }
 
-func (lm *LockManager) LockRow(batch *disk.Batch, lockMode LockMode, key []byte) error {
+func (lm *LockManager) LockRow(batch *transaction.Batch, lockMode LockMode, key []byte) error {
 	lm.keyLockMapLatch.Lock()
 	hashKey := utils.MemHash(key)
 	if _, ok := lm.keyLockMap[hashKey]; !ok {
@@ -79,7 +79,7 @@ func (lm *LockManager) LockRow(batch *disk.Batch, lockMode LockMode, key []byte)
 			lockRequestQueue.requestQueue[i] = newRequest
 			for !GrantLock(&newRequest, lockRequestQueue) {
 				lockRequestQueue.cv.Wait()
-				if batch.State == disk.ABORTED {
+				if batch.State == transaction.ABORTED {
 					lockRequestQueue.requestQueue = removeFromQueue(&lockRequestQueue.requestQueue, &newRequest)
 					lockRequestQueue.cv.Broadcast()
 					return exception.ErrBatchAborted
@@ -93,7 +93,7 @@ func (lm *LockManager) LockRow(batch *disk.Batch, lockMode LockMode, key []byte)
 	lockRequestQueue.requestQueue = append(lockRequestQueue.requestQueue, newRequest)
 	for !GrantLock(&newRequest, lockRequestQueue) {
 		lockRequestQueue.cv.Wait()
-		if batch.State == disk.ABORTED {
+		if batch.State == transaction.ABORTED {
 			lockRequestQueue.requestQueue = removeFromQueue(&lockRequestQueue.requestQueue, &newRequest)
 			lockRequestQueue.cv.Broadcast()
 			return exception.ErrBatchAborted
@@ -104,12 +104,12 @@ func (lm *LockManager) LockRow(batch *disk.Batch, lockMode LockMode, key []byte)
 	return nil
 }
 
-func (lm *LockManager) UnlockRow(batch *disk.Batch, key []byte) bool {
+func (lm *LockManager) UnlockRow(batch *transaction.Batch, key []byte) bool {
 	lm.keyLockMapLatch.Lock()
 	hashKey := utils.MemHash(key)
 	if _, ok := lm.keyLockMap[hashKey]; !ok {
 		lm.keyLockMapLatch.Unlock()
-		batch.State = disk.ABORTED
+		batch.State = transaction.ABORTED
 		return false
 	}
 	lockRequestQueue, _ := lm.keyLockMap[hashKey]
@@ -124,7 +124,7 @@ func (lm *LockManager) UnlockRow(batch *disk.Batch, key []byte) bool {
 			return true
 		}
 	}
-	batch.State = disk.ABORTED
+	batch.State = transaction.ABORTED
 	return false
 }
 

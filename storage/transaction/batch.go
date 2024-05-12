@@ -1,10 +1,10 @@
-package disk
+package transaction
 
 import (
 	"fmt"
 	"github.com/bwmarrin/snowflake"
-	"github.com/rosedblabs/rosedb/v2/common/constrants"
 	"github.com/valyala/bytebufferpool"
+	"jdb/common/constrants"
 	"sync"
 )
 
@@ -15,6 +15,10 @@ const (
 	ABORTED
 )
 
+// Batch 指db中一批操作的集合，被jdb视作事务
+// Batch保证了原子性和隔离性（要么在内存中发生崩溃全部失败，要么存储到磁盘中）
+// 通过lock_manager保证了事务的隔离性，目前支持可重复读（默认batch结束时自动释放batch期间获取的所有锁）
+// 持久性需要设置Sync选项为true
 type Batch struct {
 	PendingWrites    []*LogRecord     // 存record
 	PendingWritesMap map[uint64][]int // key -> record所在pendingWrites中的下标

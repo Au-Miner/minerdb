@@ -2,14 +2,15 @@ package execution
 
 import (
 	"fmt"
-	"github.com/rosedblabs/rosedb/v2/common/constrants"
-	"github.com/rosedblabs/rosedb/v2/common/exception"
-	"github.com/rosedblabs/rosedb/v2/common/utils"
-	"github.com/rosedblabs/rosedb/v2/concurrency"
-	"github.com/rosedblabs/rosedb/v2/storage/disk"
-	"github.com/rosedblabs/rosedb/v2/storage/index"
-	"github.com/rosedblabs/rosedb/v2/watch"
 	"io"
+	"jdb/common/constrants"
+	"jdb/common/exception"
+	"jdb/common/utils"
+	"jdb/concurrency"
+	"jdb/storage/index"
+	"jdb/storage/transaction"
+	"jdb/storage/wal"
+	"jdb/watch"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -19,7 +20,6 @@ import (
 	"github.com/bwmarrin/snowflake"
 	"github.com/gofrs/flock"
 	"github.com/robfig/cron/v3"
-	"github.com/rosedblabs/wal"
 )
 
 const (
@@ -57,7 +57,7 @@ type Stat struct {
 func (db *DB) NewExecutor(options constrants.BatchOptions) *CommonExecutor {
 	commonExecutor := &CommonExecutor{
 		db:    db,
-		batch: *disk.NewBatch(options),
+		batch: *transaction.NewBatch(options),
 	}
 	commonExecutor.lock()
 	return commonExecutor
@@ -65,12 +65,12 @@ func (db *DB) NewExecutor(options constrants.BatchOptions) *CommonExecutor {
 
 func NewExecutor() interface{} {
 	return &CommonExecutor{
-		batch: *disk.NewBatch(constrants.DefaultBatchOptions),
+		batch: *transaction.NewBatch(constrants.DefaultBatchOptions),
 	}
 }
 
 func NewRecord() interface{} {
-	return &disk.LogRecord{}
+	return &transaction.LogRecord{}
 }
 
 // 根据options来创建db
@@ -101,7 +101,7 @@ func Open(options constrants.Options) (*DB, error) {
 		fileLock:     fileLock,
 		executorPool: sync.Pool{New: NewExecutor},
 		recordPool:   sync.Pool{New: NewRecord},
-		encodeHeader: make([]byte, disk.MaxLogRecordHeaderSize),
+		encodeHeader: make([]byte, transaction.MaxLogRecordHeaderSize),
 		LockManager:  concurrency.NewLockManager(),
 	}
 	// 读取wal文件
@@ -544,9 +544,9 @@ func (db *DB) DescendKeys(pattern []byte, filterExpired bool, handleFn func(k []
 }
 
 func (db *DB) checkValue(chunk []byte) []byte {
-	record := disk.DecodeLogRecord(chunk)
+	record := transaction.DecodeLogRecord(chunk)
 	now := time.Now().UnixNano()
-	if record.Type != disk.LogRecordDeleted && !record.IsExpired(now) {
+	if record.Type != transaction.LogRecordDeleted && !record.IsExpired(now) {
 		return record.Value
 	}
 	return nil
@@ -559,7 +559,7 @@ func (db *DB) loadIndexFromWAL() error {
 	if err != nil {
 		return err
 	}
-	indexRecords := make(map[uint64][]*disk.IndexRecord)
+	indexRecords := make(map[uint64][]*transaction.IndexRecord)
 	now := time.Now().UnixNano()
 	// 创建reader
 	reader := db.dataFiles.NewReader()
@@ -576,24 +576,24 @@ func (db *DB) loadIndexFromWAL() error {
 			}
 			return err
 		}
-		record := disk.DecodeLogRecord(chunk)
+		record := transaction.DecodeLogRecord(chunk)
 
 		// 对于activeSegments中只有遇到LogRecordBatchFinished才会开始更新index
-		if record.Type == disk.LogRecordBatchFinished {
+		if record.Type == transaction.LogRecordBatchFinished {
 			batchId, err := snowflake.ParseBytes(record.Key)
 			if err != nil {
 				return err
 			}
 			for _, idxRecord := range indexRecords[uint64(batchId)] {
-				if idxRecord.RecordType == disk.LogRecordNormal {
+				if idxRecord.RecordType == transaction.LogRecordNormal {
 					db.index.Put(idxRecord.Key, idxRecord.Position)
 				}
-				if idxRecord.RecordType == disk.LogRecordDeleted {
+				if idxRecord.RecordType == transaction.LogRecordDeleted {
 					db.index.Delete(idxRecord.Key)
 				}
 			}
 			delete(indexRecords, uint64(batchId))
-		} else if record.Type == disk.LogRecordNormal && record.BatchId == mergeFinishedBatchID {
+		} else if record.Type == transaction.LogRecordNormal && record.BatchId == mergeFinishedBatchID {
 			// 如果是LogRecordNormal且batchId为mergeFinishedBatchID，说明是merge后的数据，直接放入即可
 			// 因为只处理>mergeFinSegmentId的segment，一般不会走该if
 			fmt.Println("真的走了！！！！！")
@@ -605,7 +605,7 @@ func (db *DB) loadIndexFromWAL() error {
 			}
 			// 先放到indexRecords中
 			indexRecords[record.BatchId] = append(indexRecords[record.BatchId],
-				&disk.IndexRecord{
+				&transaction.IndexRecord{
 					Key:        record.Key,
 					RecordType: record.Type,
 					Position:   position,

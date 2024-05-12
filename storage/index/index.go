@@ -1,6 +1,6 @@
 package index
 
-import "github.com/rosedblabs/wal"
+import "jdb/storage/wal"
 
 // Indexer 是用于索引键和位置的接口
 // 它用于存储数据在 WAL 中的键和位置

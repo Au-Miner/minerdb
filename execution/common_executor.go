@@ -2,22 +2,19 @@ package execution
 
 import (
 	"bytes"
-	"github.com/rosedblabs/rosedb/v2/common/exception"
-	"github.com/rosedblabs/rosedb/v2/common/utils"
-	"github.com/rosedblabs/rosedb/v2/concurrency"
-	"github.com/rosedblabs/rosedb/v2/storage/disk"
-	"github.com/rosedblabs/rosedb/v2/watch"
+	"jdb/common/exception"
+	"jdb/common/utils"
+	"jdb/concurrency"
+	"jdb/storage/transaction"
+	"jdb/watch"
 	"time"
 
 	"github.com/valyala/bytebufferpool"
 )
 
-// Batch 指db中一批操作的集合，被jdb视作事务
-// 目前不能成为事务，不能保证隔离性
-// 目前想要保证原子性、一致性、持久性，需要设置Sync选项为true
 type CommonExecutor struct {
 	db    *DB
-	batch disk.Batch
+	batch transaction.Batch
 }
 
 func (ce *CommonExecutor) init(rdonly, sync bool, db *DB) *CommonExecutor {
@@ -75,11 +72,11 @@ func (ce *CommonExecutor) Put(key []byte, value []byte) error {
 	if record == nil {
 		// 如果key不存在于pendingWrites中，写入一个新的record
 		// 当batch提交或回滚时，record会被放回到pool中
-		record = ce.db.recordPool.Get().(*disk.LogRecord)
+		record = ce.db.recordPool.Get().(*transaction.LogRecord)
 		ce.appendPendingWrites(key, record)
 	}
 	record.Key, record.Value = key, value
-	record.Type, record.Expire = disk.LogRecordNormal, 0
+	record.Type, record.Expire = transaction.LogRecordNormal, 0
 	ce.batch.Mu.Unlock()
 	return nil
 }
@@ -104,11 +101,11 @@ func (ce *CommonExecutor) ConcurrentPut(key []byte, value []byte, lockManager *c
 	if record == nil {
 		// 如果key不存在于pendingWrites中，写入一个新的record
 		// 当batch提交或回滚时，record会被放回到pool中
-		record = ce.db.recordPool.Get().(*disk.LogRecord)
+		record = ce.db.recordPool.Get().(*transaction.LogRecord)
 		ce.appendPendingWrites(key, record)
 	}
 	record.Key, record.Value = key, value
-	record.Type, record.Expire = disk.LogRecordNormal, 0
+	record.Type, record.Expire = transaction.LogRecordNormal, 0
 	ce.batch.Mu.Unlock()
 	return nil
 }
@@ -127,11 +124,11 @@ func (ce *CommonExecutor) PutWithTTL(key []byte, value []byte, ttl time.Duration
 	ce.batch.Mu.Lock()
 	var record = ce.lookupPendingWrites(key)
 	if record == nil {
-		record = ce.db.recordPool.Get().(*disk.LogRecord)
+		record = ce.db.recordPool.Get().(*transaction.LogRecord)
 		ce.appendPendingWrites(key, record)
 	}
 	record.Key, record.Value = key, value
-	record.Type, record.Expire = disk.LogRecordNormal, time.Now().Add(ttl).UnixNano()
+	record.Type, record.Expire = transaction.LogRecordNormal, time.Now().Add(ttl).UnixNano()
 	ce.batch.Mu.Unlock()
 	return nil
 }
@@ -150,7 +147,7 @@ func (ce *CommonExecutor) Get(key []byte) ([]byte, error) {
 	ce.batch.Mu.RUnlock()
 	// 如果当前batch的pendingWrites中存在key，直接返回value
 	if record != nil {
-		if record.Type == disk.LogRecordDeleted || record.IsExpired(now) {
+		if record.Type == transaction.LogRecordDeleted || record.IsExpired(now) {
 			return nil, exception.ErrKeyNotFound
 		}
 		return record.Value, nil
@@ -164,9 +161,9 @@ func (ce *CommonExecutor) Get(key []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	record = disk.DecodeLogRecord(chunk)
+	record = transaction.DecodeLogRecord(chunk)
 	// 检查logRecord是否被删除或过期
-	if record.Type == disk.LogRecordDeleted {
+	if record.Type == transaction.LogRecordDeleted {
 		panic("Deleted data cannot exist in the index")
 	}
 	if record.IsExpired(now) {
@@ -193,7 +190,7 @@ func (ce *CommonExecutor) ConcurrentGet(key []byte, lockManager *concurrency.Loc
 	ce.batch.Mu.RUnlock()
 	// 如果当前batch的pendingWrites中存在key，直接返回value
 	if record != nil {
-		if record.Type == disk.LogRecordDeleted || record.IsExpired(now) {
+		if record.Type == transaction.LogRecordDeleted || record.IsExpired(now) {
 			return nil, exception.ErrKeyNotFound
 		}
 		return record.Value, nil
@@ -207,9 +204,9 @@ func (ce *CommonExecutor) ConcurrentGet(key []byte, lockManager *concurrency.Loc
 	if err != nil {
 		return nil, err
 	}
-	record = disk.DecodeLogRecord(chunk)
+	record = transaction.DecodeLogRecord(chunk)
 	// 检查logRecord是否被删除或过期
-	if record.Type == disk.LogRecordDeleted {
+	if record.Type == transaction.LogRecordDeleted {
 		panic("Deleted data cannot exist in the index")
 	}
 	if record.IsExpired(now) {
@@ -234,15 +231,15 @@ func (ce *CommonExecutor) Delete(key []byte) error {
 	var exist bool
 	var record = ce.lookupPendingWrites(key)
 	if record != nil {
-		record.Type = disk.LogRecordDeleted
+		record.Type = transaction.LogRecordDeleted
 		record.Value = nil
 		record.Expire = 0
 		exist = true
 	}
 	if !exist {
-		record = &disk.LogRecord{
+		record = &transaction.LogRecord{
 			Key:  key,
-			Type: disk.LogRecordDeleted,
+			Type: transaction.LogRecordDeleted,
 		}
 		ce.appendPendingWrites(key, record)
 	}
@@ -268,15 +265,15 @@ func (ce *CommonExecutor) ConcurrentDelete(key []byte, lockManager *concurrency.
 	var exist bool
 	var record = ce.lookupPendingWrites(key)
 	if record != nil {
-		record.Type = disk.LogRecordDeleted
+		record.Type = transaction.LogRecordDeleted
 		record.Value = nil
 		record.Expire = 0
 		exist = true
 	}
 	if !exist {
-		record = &disk.LogRecord{
+		record = &transaction.LogRecord{
 			Key:  key,
-			Type: disk.LogRecordDeleted,
+			Type: transaction.LogRecordDeleted,
 		}
 		ce.appendPendingWrites(key, record)
 	}
@@ -298,7 +295,7 @@ func (ce *CommonExecutor) Exist(key []byte) (bool, error) {
 	var record = ce.lookupPendingWrites(key)
 	ce.batch.Mu.RUnlock()
 	if record != nil {
-		return record.Type != disk.LogRecordDeleted && !record.IsExpired(now), nil
+		return record.Type != transaction.LogRecordDeleted && !record.IsExpired(now), nil
 	}
 	// 检查是否存在dataFiles中
 	position := ce.db.index.Get(key)
@@ -309,8 +306,8 @@ func (ce *CommonExecutor) Exist(key []byte) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	record = disk.DecodeLogRecord(chunk)
-	if record.Type == disk.LogRecordDeleted || record.IsExpired(now) {
+	record = transaction.DecodeLogRecord(chunk)
+	if record.Type == transaction.LogRecordDeleted || record.IsExpired(now) {
 		ce.db.index.Delete(record.Key)
 		return false, nil
 	}
@@ -335,7 +332,7 @@ func (ce *CommonExecutor) Expire(key []byte, ttl time.Duration) error {
 
 	// 如果pendingWrites中有，则直接更新
 	if record != nil {
-		if record.Type == disk.LogRecordDeleted || record.IsExpired(time.Now().UnixNano()) {
+		if record.Type == transaction.LogRecordDeleted || record.IsExpired(time.Now().UnixNano()) {
 			return exception.ErrKeyNotFound
 		}
 		record.Expire = time.Now().Add(ttl).UnixNano()
@@ -352,9 +349,9 @@ func (ce *CommonExecutor) Expire(key []byte, ttl time.Duration) error {
 	}
 
 	now := time.Now()
-	record = disk.DecodeLogRecord(chunk)
+	record = transaction.DecodeLogRecord(chunk)
 	// 如果record已经被删除或者过期，无法设置ttl
-	if record.Type == disk.LogRecordDeleted || record.IsExpired(now.UnixNano()) {
+	if record.Type == transaction.LogRecordDeleted || record.IsExpired(now.UnixNano()) {
 		ce.db.index.Delete(key)
 		return exception.ErrKeyNotFound
 	}
@@ -383,7 +380,7 @@ func (ce *CommonExecutor) TTL(key []byte) (time.Duration, error) {
 		if record.Expire == 0 {
 			return -1, nil
 		}
-		if record.Type == disk.LogRecordDeleted || record.IsExpired(now.UnixNano()) {
+		if record.Type == transaction.LogRecordDeleted || record.IsExpired(now.UnixNano()) {
 			return -1, exception.ErrKeyNotFound
 		}
 		return time.Duration(record.Expire - now.UnixNano()), nil
@@ -399,8 +396,8 @@ func (ce *CommonExecutor) TTL(key []byte) (time.Duration, error) {
 		return -1, err
 	}
 
-	record = disk.DecodeLogRecord(chunk)
-	if record.Type == disk.LogRecordDeleted {
+	record = transaction.DecodeLogRecord(chunk)
+	if record.Type == transaction.LogRecordDeleted {
 		return -1, exception.ErrKeyNotFound
 	}
 	if record.IsExpired(now.UnixNano()) {
@@ -439,15 +436,15 @@ func (ce *CommonExecutor) Commit() error {
 		buf := bytebufferpool.Get()
 		ce.batch.Buffers = append(ce.batch.Buffers, buf)
 		record.BatchId = uint64(batchId)
-		encRecord := disk.EncodeLogRecord(record, ce.db.encodeHeader, buf)
+		encRecord := transaction.EncodeLogRecord(record, ce.db.encodeHeader, buf)
 		ce.db.dataFiles.PendingWrites(encRecord)
 	}
 	// 在PendingWrites中写一个record，表示batch结束
 	buf := bytebufferpool.Get()
 	ce.batch.Buffers = append(ce.batch.Buffers, buf)
-	endRecord := disk.EncodeLogRecord(&disk.LogRecord{
+	endRecord := transaction.EncodeLogRecord(&transaction.LogRecord{
 		Key:  batchId.Bytes(),
-		Type: disk.LogRecordBatchFinished,
+		Type: transaction.LogRecordBatchFinished,
 	}, ce.db.encodeHeader, buf)
 	ce.db.dataFiles.PendingWrites(endRecord)
 	// 把wal.pendingWrites写入到WAL中，但不sync
@@ -467,14 +464,14 @@ func (ce *CommonExecutor) Commit() error {
 	}
 	// 写入index
 	for i, record := range ce.batch.PendingWrites {
-		if record.Type == disk.LogRecordDeleted || record.IsExpired(now) {
+		if record.Type == transaction.LogRecordDeleted || record.IsExpired(now) {
 			ce.db.index.Delete(record.Key)
 		} else {
 			ce.db.index.Put(record.Key, chunkPositions[i])
 		}
 		if ce.db.options.WatchQueueSize > 0 {
 			e := &watch.Event{Key: record.Key, Value: record.Value, BatchId: record.BatchId}
-			if record.Type == disk.LogRecordDeleted {
+			if record.Type == transaction.LogRecordDeleted {
 				e.Action = watch.WatchActionDelete
 			} else {
 				e.Action = watch.WatchActionPut
@@ -511,15 +508,15 @@ func (ce *CommonExecutor) ConcurrentCommit(key []byte, lockManager *concurrency.
 		buf := bytebufferpool.Get()
 		ce.batch.Buffers = append(ce.batch.Buffers, buf)
 		record.BatchId = uint64(batchId)
-		encRecord := disk.EncodeLogRecord(record, ce.db.encodeHeader, buf)
+		encRecord := transaction.EncodeLogRecord(record, ce.db.encodeHeader, buf)
 		ce.db.dataFiles.PendingWrites(encRecord)
 	}
 	// 在PendingWrites中写一个record，表示batch结束
 	buf := bytebufferpool.Get()
 	ce.batch.Buffers = append(ce.batch.Buffers, buf)
-	endRecord := disk.EncodeLogRecord(&disk.LogRecord{
+	endRecord := transaction.EncodeLogRecord(&transaction.LogRecord{
 		Key:  batchId.Bytes(),
-		Type: disk.LogRecordBatchFinished,
+		Type: transaction.LogRecordBatchFinished,
 	}, ce.db.encodeHeader, buf)
 	ce.db.dataFiles.PendingWrites(endRecord)
 	// 把wal.pendingWrites写入到WAL中，但不sync
@@ -539,14 +536,14 @@ func (ce *CommonExecutor) ConcurrentCommit(key []byte, lockManager *concurrency.
 	}
 	// 写入index
 	for i, record := range ce.batch.PendingWrites {
-		if record.Type == disk.LogRecordDeleted || record.IsExpired(now) {
+		if record.Type == transaction.LogRecordDeleted || record.IsExpired(now) {
 			ce.db.index.Delete(record.Key)
 		} else {
 			ce.db.index.Put(record.Key, chunkPositions[i])
 		}
 		if ce.db.options.WatchQueueSize > 0 {
 			e := &watch.Event{Key: record.Key, Value: record.Value, BatchId: record.BatchId}
-			if record.Type == disk.LogRecordDeleted {
+			if record.Type == transaction.LogRecordDeleted {
 				e.Action = watch.WatchActionDelete
 			} else {
 				e.Action = watch.WatchActionPut
@@ -619,7 +616,7 @@ func (ce *CommonExecutor) ConcurrentRollback(key []byte, lockManager *concurrenc
 }
 
 // lookupPendingWrites 如果pendingWrites中存在key，返回record
-func (ce *CommonExecutor) lookupPendingWrites(key []byte) *disk.LogRecord {
+func (ce *CommonExecutor) lookupPendingWrites(key []byte) *transaction.LogRecord {
 	if len(ce.batch.PendingWritesMap) == 0 {
 		return nil
 	}
@@ -635,7 +632,7 @@ func (ce *CommonExecutor) lookupPendingWrites(key []byte) *disk.LogRecord {
 }
 
 // 增加新record到pendingWrites和pendingWritesMap.
-func (ce *CommonExecutor) appendPendingWrites(key []byte, record *disk.LogRecord) {
+func (ce *CommonExecutor) appendPendingWrites(key []byte, record *transaction.LogRecord) {
 	ce.batch.PendingWrites = append(ce.batch.PendingWrites, record)
 	if ce.batch.PendingWritesMap == nil {
 		ce.batch.PendingWritesMap = make(map[uint64][]int)

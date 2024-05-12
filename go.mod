@@ -1,10 +1,9 @@
-module github.com/rosedblabs/rosedb/v2
+module jdb
 
 go 1.19
 
 require (
 	github.com/google/btree v1.1.2
-	github.com/rosedblabs/wal v1.3.6-0.20230924022528-3202245af020
 	github.com/valyala/bytebufferpool v1.0.0
 )
 

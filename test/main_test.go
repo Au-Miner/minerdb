@@ -2,9 +2,9 @@ package test
 
 import (
 	"fmt"
-	"github.com/rosedblabs/rosedb/v2/common/constrants"
-	"github.com/rosedblabs/rosedb/v2/common/utils"
-	"github.com/rosedblabs/rosedb/v2/execution"
+	"jdb/common/constrants"
+	"jdb/common/utils"
+	"jdb/execution"
 	"log"
 	"os"
 	"testing"
@@ -13,7 +13,7 @@ import (
 
 func TestBasic(t *testing.T) {
 	options := constrants.DefaultOptions
-	options.DirPath = "/tmp/jdb_basic"
+	options.DirPath = "/tmp/jdb"
 	defer func() {
 		_ = os.RemoveAll(options.DirPath)
 	}()
@@ -45,7 +45,7 @@ func TestBasic(t *testing.T) {
 
 func TestLock(t *testing.T) {
 	options := constrants.DefaultOptions
-	options.DirPath = "/tmp/jdb_basic"
+	options.DirPath = "/tmp/jdb"
 	defer func() {
 		_ = os.RemoveAll(options.DirPath)
 	}()
@@ -77,7 +77,7 @@ func TestLock(t *testing.T) {
 
 func TestBatch(t *testing.T) {
 	options := constrants.DefaultOptions
-	options.DirPath = "/tmp/rosedb_batch"
+	options.DirPath = "/tmp/jdb"
 
 	db, err := execution.Open(options)
 	if err != nil {
@@ -101,7 +101,7 @@ func TestBatch(t *testing.T) {
 
 func TestMerge(t *testing.T) {
 	options := constrants.DefaultOptions
-	options.DirPath = "/tmp/rosedb_merge"
+	options.DirPath = "/tmp/jdb"
 
 	db, err := execution.Open(options)
 	if err != nil {
@@ -124,7 +124,7 @@ func TestMerge(t *testing.T) {
 
 func TestWatch(t *testing.T) {
 	options := constrants.DefaultOptions
-	options.DirPath = "/tmp/rosedb_watch"
+	options.DirPath = "/tmp/jdb"
 	options.WatchQueueSize = 1000
 
 	db, err := execution.Open(options)
@@ -163,7 +163,7 @@ func TestWatch(t *testing.T) {
 
 func TestTTL(t *testing.T) {
 	options := constrants.DefaultOptions
-	options.DirPath = "/tmp/rosedb_ttl"
+	options.DirPath = "/tmp/jdb"
 
 	db, err := execution.Open(options)
 	if err != nil {
@@ -199,7 +199,7 @@ func TestTTL(t *testing.T) {
 
 func TestIterate(t *testing.T) {
 	options := constrants.DefaultOptions
-	options.DirPath = "/tmp/rosedb_iterate"
+	options.DirPath = "/tmp/jdb"
 
 	db, err := execution.Open(options)
 	if err != nil {

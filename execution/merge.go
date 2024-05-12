@@ -3,18 +3,18 @@ package execution
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/rosedblabs/rosedb/v2/common/constrants"
-	"github.com/rosedblabs/rosedb/v2/common/exception"
-	"github.com/rosedblabs/rosedb/v2/storage/disk"
-	"github.com/rosedblabs/rosedb/v2/storage/index"
 	"io"
+	"jdb/common/constrants"
+	"jdb/common/exception"
+	"jdb/storage/index"
+	"jdb/storage/transaction"
+	"jdb/storage/wal"
 	"math"
 	"os"
 	"path/filepath"
 	"sync/atomic"
 	"time"
 
-	"github.com/rosedblabs/wal"
 	"github.com/valyala/bytebufferpool"
 )
 
@@ -108,9 +108,9 @@ func (db *DB) doMerge() error {
 			}
 			return err
 		}
-		record := disk.DecodeLogRecord(chunk)
+		record := transaction.DecodeLogRecord(chunk)
 		// 只处理LogRecordNormal, 忽略LogRecordDeleted和LogRecordBatchFinished
-		if record.Type == disk.LogRecordNormal && (record.Expire == 0 || record.Expire > now) {
+		if record.Type == transaction.LogRecordNormal && (record.Expire == 0 || record.Expire > now) {
 			db.mu.RLock()
 			indexPos := db.index.Get(record.Key)
 			db.mu.RUnlock()
@@ -118,11 +118,11 @@ func (db *DB) doMerge() error {
 				// 清空record的batchId为0
 				record.BatchId = mergeFinishedBatchID
 				// mergeDB只用来存储merge后的数据，不会用来读写操作，所以不需要更新index
-				newPosition, err := mergeDB.dataFiles.Write(disk.EncodeLogRecord(record, mergeDB.encodeHeader, buf))
+				newPosition, err := mergeDB.dataFiles.Write(transaction.EncodeLogRecord(record, mergeDB.encodeHeader, buf))
 				if err != nil {
 					return err
 				}
-				_, err = mergeDB.hintFile.Write(disk.EncodeHintRecord(record.Key, newPosition))
+				_, err = mergeDB.hintFile.Write(transaction.EncodeHintRecord(record.Key, newPosition))
 				if err != nil {
 					return err
 				}
@@ -135,7 +135,7 @@ func (db *DB) doMerge() error {
 	if err != nil {
 		return err
 	}
-	_, err = mergeFinFile.Write(disk.EncodeMergeFinRecord(prevActiveSegId))
+	_, err = mergeFinFile.Write(transaction.EncodeMergeFinRecord(prevActiveSegId))
 	if err != nil {
 		return err
 	}
@@ -303,7 +303,7 @@ func (db *DB) loadIndexFromHintFile() error {
 			}
 			return err
 		}
-		key, position := disk.DecodeHintRecord(chunk)
+		key, position := transaction.DecodeHintRecord(chunk)
 		db.index.Put(key, position)
 	}
 	return nil
