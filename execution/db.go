@@ -29,7 +29,7 @@ const (
 	mergeFinNameSuffix = ".MERGEFIN"
 )
 
-type DB struct {
+type JDB struct {
 	dataFiles     *wal.WAL      // 所有bitcask日志文件
 	hintFile      *wal.WAL      // merge期间所有older data file统计的hint，用于快速恢复index
 	index         index.Indexer // key->wal.ChunkPosition，pos是wal写入后返回的信息
@@ -54,7 +54,7 @@ type Stat struct {
 }
 
 // NewExecutor 通过db.NewExecutor来新建executor
-func (db *DB) NewExecutor(options constrants.BatchOptions) *CommonExecutor {
+func (db *JDB) NewExecutor(options constrants.BatchOptions) *CommonExecutor {
 	commonExecutor := &CommonExecutor{
 		db:    db,
 		batch: *transaction.NewBatch(options),
@@ -74,7 +74,7 @@ func NewRecord() interface{} {
 }
 
 // 根据options来创建db
-func Open(options constrants.Options) (*DB, error) {
+func Open(options constrants.Options) (*JDB, error) {
 	// 创建文件夹
 	if _, err := os.Stat(options.DirPath); err != nil {
 		if err := os.MkdirAll(options.DirPath, os.ModePerm); err != nil {
@@ -95,7 +95,7 @@ func Open(options constrants.Options) (*DB, error) {
 		return nil, err
 	}
 	// 初始化DB实例
-	db := &DB{
+	db := &JDB{
 		index:        index.NewIndexer(),
 		options:      options,
 		fileLock:     fileLock,
@@ -139,7 +139,7 @@ func Open(options constrants.Options) (*DB, error) {
 	return db, nil
 }
 
-func (db *DB) openWalFiles() (*wal.WAL, error) {
+func (db *JDB) openWalFiles() (*wal.WAL, error) {
 	// 从WAL中读取数据
 	walFiles, err := wal.Open(wal.Options{
 		DirPath:        db.options.DirPath,
@@ -155,7 +155,7 @@ func (db *DB) openWalFiles() (*wal.WAL, error) {
 	return walFiles, nil
 }
 
-func (db *DB) loadIndex() error {
+func (db *JDB) loadIndex() error {
 	// 从hint file创建index
 	if err := db.loadIndexFromHintFile(); err != nil {
 		return err
@@ -168,7 +168,7 @@ func (db *DB) loadIndex() error {
 }
 
 // Close 关闭db，db后续不能用
-func (db *DB) Close() error {
+func (db *JDB) Close() error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	if err := db.closeFiles(); err != nil {
@@ -192,7 +192,7 @@ func (db *DB) Close() error {
 }
 
 // closeFiles close所有data files和hint file
-func (db *DB) closeFiles() error {
+func (db *JDB) closeFiles() error {
 	if err := db.dataFiles.Close(); err != nil {
 		return err
 	}
@@ -205,7 +205,7 @@ func (db *DB) closeFiles() error {
 }
 
 // Sync sync activeSegment到磁盘
-func (db *DB) Sync() error {
+func (db *JDB) Sync() error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
@@ -213,7 +213,7 @@ func (db *DB) Sync() error {
 }
 
 // Stat 返回database统计信息
-func (db *DB) Stat() *Stat {
+func (db *JDB) Stat() *Stat {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
@@ -229,7 +229,7 @@ func (db *DB) Stat() *Stat {
 }
 
 // Put 调用db.Put操作，只会将一个Put操作放入commonExecutorh中，并commit掉
-func (db *DB) Put(key []byte, value []byte) error {
+func (db *JDB) Put(key []byte, value []byte) error {
 	commonExecutor := db.executorPool.Get().(*CommonExecutor)
 	defer func() {
 		// 最后要reset
@@ -245,7 +245,7 @@ func (db *DB) Put(key []byte, value []byte) error {
 	return commonExecutor.Commit()
 }
 
-func (db *DB) ConcurrentPut(key []byte, value []byte) error {
+func (db *JDB) ConcurrentPut(key []byte, value []byte) error {
 	commonExecutor := db.executorPool.Get().(*CommonExecutor)
 	defer func() {
 		// 最后要reset
@@ -262,7 +262,7 @@ func (db *DB) ConcurrentPut(key []byte, value []byte) error {
 }
 
 // PutWithTTL kv对携带ttl
-func (db *DB) PutWithTTL(key []byte, value []byte, ttl time.Duration) error {
+func (db *JDB) PutWithTTL(key []byte, value []byte, ttl time.Duration) error {
 	commonExecutor := db.executorPool.Get().(*CommonExecutor)
 	defer func() {
 		commonExecutor.reset()
@@ -277,7 +277,7 @@ func (db *DB) PutWithTTL(key []byte, value []byte, ttl time.Duration) error {
 }
 
 // Get get value
-func (db *DB) Get(key []byte) ([]byte, error) {
+func (db *JDB) Get(key []byte) ([]byte, error) {
 	commonExecutor := db.executorPool.Get().(*CommonExecutor)
 	commonExecutor.init(true, false, db)
 	defer func() {
@@ -288,7 +288,7 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 	return commonExecutor.Get(key)
 }
 
-func (db *DB) ConcurrentGet(key []byte) ([]byte, error) {
+func (db *JDB) ConcurrentGet(key []byte) ([]byte, error) {
 	commonExecutor := db.executorPool.Get().(*CommonExecutor)
 	commonExecutor.init(true, false, db)
 	defer func() {
@@ -305,7 +305,7 @@ func (db *DB) ConcurrentGet(key []byte) ([]byte, error) {
 }
 
 // Delete 删除特定的key
-func (db *DB) Delete(key []byte) error {
+func (db *JDB) Delete(key []byte) error {
 	commonExecutor := db.executorPool.Get().(*CommonExecutor)
 	defer func() {
 		commonExecutor.reset()
@@ -320,7 +320,7 @@ func (db *DB) Delete(key []byte) error {
 	return commonExecutor.Commit()
 }
 
-func (db *DB) ConcurrentDelete(key []byte) error {
+func (db *JDB) ConcurrentDelete(key []byte) error {
 	commonExecutor := db.executorPool.Get().(*CommonExecutor)
 	defer func() {
 		commonExecutor.reset()
@@ -336,7 +336,7 @@ func (db *DB) ConcurrentDelete(key []byte) error {
 }
 
 // Exist 检查是否存在key
-func (db *DB) Exist(key []byte) (bool, error) {
+func (db *JDB) Exist(key []byte) (bool, error) {
 	commonExecutor := db.executorPool.Get().(*CommonExecutor)
 	commonExecutor.init(true, false, db)
 	defer func() {
@@ -348,7 +348,7 @@ func (db *DB) Exist(key []byte) (bool, error) {
 }
 
 // Expire 手动设置key对应的ttl，和put、PutWithTTL类似
-func (db *DB) Expire(key []byte, ttl time.Duration) error {
+func (db *JDB) Expire(key []byte, ttl time.Duration) error {
 	commonExecutor := db.executorPool.Get().(*CommonExecutor)
 	defer func() {
 		commonExecutor.reset()
@@ -363,7 +363,7 @@ func (db *DB) Expire(key []byte, ttl time.Duration) error {
 }
 
 // TTL 获取key的ttl
-func (db *DB) TTL(key []byte) (time.Duration, error) {
+func (db *JDB) TTL(key []byte) (time.Duration, error) {
 	commonExecutor := db.executorPool.Get().(*CommonExecutor)
 	commonExecutor.init(true, false, db)
 	defer func() {
@@ -374,7 +374,7 @@ func (db *DB) TTL(key []byte) (time.Duration, error) {
 	return commonExecutor.TTL(key)
 }
 
-func (db *DB) Watch() (<-chan *watch.Event, error) {
+func (db *JDB) Watch() (<-chan *watch.Event, error) {
 	if db.options.WatchQueueSize <= 0 {
 		return nil, exception.ErrWatchDisabled
 	}
@@ -382,7 +382,7 @@ func (db *DB) Watch() (<-chan *watch.Event, error) {
 }
 
 // Ascend 按照key升序枚举，每个kv对调用handleFn
-func (db *DB) Ascend(handleFn func(k []byte, v []byte) (bool, error)) {
+func (db *JDB) Ascend(handleFn func(k []byte, v []byte) (bool, error)) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 
@@ -399,7 +399,7 @@ func (db *DB) Ascend(handleFn func(k []byte, v []byte) (bool, error)) {
 }
 
 // AscendRange 处在[startKey, endKey]范围内的ascend
-func (db *DB) AscendRange(startKey, endKey []byte, handleFn func(k []byte, v []byte) (bool, error)) {
+func (db *JDB) AscendRange(startKey, endKey []byte, handleFn func(k []byte, v []byte) (bool, error)) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 
@@ -416,7 +416,7 @@ func (db *DB) AscendRange(startKey, endKey []byte, handleFn func(k []byte, v []b
 }
 
 // AscendGreaterOrEqual >=key的执行handleFn
-func (db *DB) AscendGreaterOrEqual(key []byte, handleFn func(k []byte, v []byte) (bool, error)) {
+func (db *JDB) AscendGreaterOrEqual(key []byte, handleFn func(k []byte, v []byte) (bool, error)) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 
@@ -434,7 +434,7 @@ func (db *DB) AscendGreaterOrEqual(key []byte, handleFn func(k []byte, v []byte)
 
 // AscendKeys 根据key升序排列，调用handleFn，通过pattern筛选
 // 设置filterExpired为false时，不需要查找value；为true时，会过滤过期的key但会影响性能
-func (db *DB) AscendKeys(pattern []byte, filterExpired bool, handleFn func(k []byte) (bool, error)) {
+func (db *JDB) AscendKeys(pattern []byte, filterExpired bool, handleFn func(k []byte) (bool, error)) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 	var reg *regexp.Regexp
@@ -463,7 +463,7 @@ func (db *DB) AscendKeys(pattern []byte, filterExpired bool, handleFn func(k []b
 }
 
 // Descend 按照key降序枚举，每个kv对调用handleFn
-func (db *DB) Descend(handleFn func(k []byte, v []byte) (bool, error)) {
+func (db *JDB) Descend(handleFn func(k []byte, v []byte) (bool, error)) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 
@@ -480,7 +480,7 @@ func (db *DB) Descend(handleFn func(k []byte, v []byte) (bool, error)) {
 }
 
 // DescendRange 处在[startKey, endKey]范围内的descend
-func (db *DB) DescendRange(startKey, endKey []byte, handleFn func(k []byte, v []byte) (bool, error)) {
+func (db *JDB) DescendRange(startKey, endKey []byte, handleFn func(k []byte, v []byte) (bool, error)) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 
@@ -497,7 +497,7 @@ func (db *DB) DescendRange(startKey, endKey []byte, handleFn func(k []byte, v []
 }
 
 // DescendLessOrEqual <=key的执行handleFn
-func (db *DB) DescendLessOrEqual(key []byte, handleFn func(k []byte, v []byte) (bool, error)) {
+func (db *JDB) DescendLessOrEqual(key []byte, handleFn func(k []byte, v []byte) (bool, error)) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 
@@ -515,7 +515,7 @@ func (db *DB) DescendLessOrEqual(key []byte, handleFn func(k []byte, v []byte) (
 
 // DescendKeys 根据key降序排列，调用handleFn，通过pattern筛选
 // 设置filterExpired为false时，不需要查找value；为true时，会过滤过期的key但会影响性能
-func (db *DB) DescendKeys(pattern []byte, filterExpired bool, handleFn func(k []byte) (bool, error)) {
+func (db *JDB) DescendKeys(pattern []byte, filterExpired bool, handleFn func(k []byte) (bool, error)) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 	var reg *regexp.Regexp
@@ -543,7 +543,7 @@ func (db *DB) DescendKeys(pattern []byte, filterExpired bool, handleFn func(k []
 	})
 }
 
-func (db *DB) checkValue(chunk []byte) []byte {
+func (db *JDB) checkValue(chunk []byte) []byte {
 	record := transaction.DecodeLogRecord(chunk)
 	now := time.Now().UnixNano()
 	if record.Type != transaction.LogRecordDeleted && !record.IsExpired(now) {
@@ -554,7 +554,7 @@ func (db *DB) checkValue(chunk []byte) []byte {
 
 // loadIndexFromWAL 从wal中来加载索引
 // 它会加载所有WAL files来重建index
-func (db *DB) loadIndexFromWAL() error {
+func (db *JDB) loadIndexFromWAL() error {
 	mergeFinSegmentId, err := getMergeFinSegmentId(db.options.DirPath)
 	if err != nil {
 		return err

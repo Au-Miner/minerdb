@@ -28,7 +28,7 @@ const (
 // Merge操作很耗时，建议当db空闲时执行
 // 当reopenAfterDone为真时，原始文件将被合并文件替换，并在合并完成后重建db的索引
 // 当reopenAfterDone为假时，合并完成后不会重建索引
-func (db *DB) Merge(reopenAfterDone bool) error {
+func (db *JDB) Merge(reopenAfterDone bool) error {
 	// 核心：doMerge()
 	if err := db.doMerge(); err != nil {
 		return err
@@ -57,7 +57,7 @@ func (db *DB) Merge(reopenAfterDone bool) error {
 }
 
 // merge阶段会将所有older data file合并为merged data file，并创建全部数据的索引的hint file(唯一)
-func (db *DB) doMerge() error {
+func (db *JDB) doMerge() error {
 	db.mu.Lock()
 	// 检查是否database已关、data files为空、merge操作正在进行
 	if db.isClose {
@@ -146,7 +146,7 @@ func (db *DB) doMerge() error {
 }
 
 // 创建一个新的merge db
-func (db *DB) openMergeDB() (*DB, error) {
+func (db *JDB) openMergeDB() (*JDB, error) {
 	// dirPath加上-merge后缀
 	mergePath := mergeDirPath(db.options.DirPath)
 	if err := os.RemoveAll(mergePath); err != nil {
@@ -182,7 +182,7 @@ func mergeDirPath(dirPath string) string {
 	return filepath.Join(dir, base+mergeDirSuffixName)
 }
 
-func (db *DB) openMergeFinishedFile() (*wal.WAL, error) {
+func (db *JDB) openMergeFinishedFile() (*wal.WAL, error) {
 	return wal.Open(wal.Options{
 		DirPath:        db.options.DirPath,
 		SegmentSize:    constrants.GB,
@@ -279,7 +279,7 @@ func getMergeFinSegmentId(mergePath string) (wal.SegmentID, error) {
 	return mergeFinSegmentId, nil
 }
 
-func (db *DB) loadIndexFromHintFile() error {
+func (db *JDB) loadIndexFromHintFile() error {
 	hintFile, err := wal.Open(wal.Options{
 		DirPath:        db.options.DirPath,
 		SegmentSize:    math.MaxInt64,

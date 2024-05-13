@@ -13,11 +13,11 @@ import (
 )
 
 type CommonExecutor struct {
-	db    *DB
+	db    *JDB
 	batch transaction.Batch
 }
 
-func (ce *CommonExecutor) init(rdonly, sync bool, db *DB) *CommonExecutor {
+func (ce *CommonExecutor) init(rdonly, sync bool, db *JDB) *CommonExecutor {
 	ce.batch.Options.ReadOnly = rdonly
 	ce.batch.Options.Sync = sync
 	ce.db = db

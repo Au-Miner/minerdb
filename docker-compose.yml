@@ -1,0 +1,42 @@
+version: "1.0"
+
+networks:
+  jdb:
+    external: false
+
+#services:
+#  node:
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#    volumes:
+#      - ./data:/app/data
+#    restart: on-failure
+#    deploy:
+#      replicas: 5  # 设置为 5 个副本
+#    ports:
+#      - '3001:3001'  # 定义每个容器的端口映射
+
+services:
+  bootstrap-node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    hostname: bootstrap-node
+    ports:
+      - '3001:3001'
+    volumes:
+      - ./data:/app/data
+    restart: on-failure
+
+  node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./data:/app/data
+    restart: on-failure
+    depends_on:
+      - bootstrap-node
+    deploy:
+      replicas: 4
