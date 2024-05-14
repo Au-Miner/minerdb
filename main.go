@@ -2,12 +2,12 @@ package main
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"jdb/api/proto/protoserver"
-	"jdb/api/rest/middleware"
-	"jdb/api/rest/route"
-	"jdb/discover/mdnsdiscover"
-	"jdb/internal/app"
-	"jdb/internal/config"
+	"jdb/raft/api/proto/proto_server"
+	"jdb/raft/api/rest/middle_ware"
+	"jdb/raft/api/rest/route"
+	"jdb/raft/discover/mdns_discover"
+	"jdb/raft/starter/app"
+	"jdb/raft/starter/config"
 	"log"
 	"runtime"
 	"sync"
@@ -20,9 +20,9 @@ func init() {
 }
 
 func main() {
-	cfg, errCfg := config.New()
-	if errCfg != nil {
-		log.Fatalln(errCfg)
+	cfg, err := config.New()
+	if err != nil {
+		log.Fatalln(err)
 	}
 	start(app.NewApp(cfg))
 }
@@ -32,24 +32,26 @@ func start(a *app.App) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		// 创建fiber的http监听服务（负责解析http请求）
 		startApiRest(a)
 	}()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		// 创建grpc的监听服务（负责node之间的通信）
 		startApiProto(a)
 	}()
 	if a.Config.Cluster.DiscoverStrategy == config.DiscoverDefault {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			mdnsdiscover.ServeAndBlock(a.Config.CurrentNode.Host, 8001)
+			// 创建mdns服务
+			mdns_discover.ServeAndBlock(a.Config.CurrentNode.Host, 8001)
 		}()
 	}
 	wg.Wait()
 }
 
-// 启动restful api监听（目前使用fiber框架）
 func startApiRest(a *app.App) {
 	errListen := newApiRest(a).Listen(a.Config.CurrentNode.ApiAddress)
 	if errListen != nil {
@@ -57,17 +59,17 @@ func startApiRest(a *app.App) {
 	}
 }
 
+func newApiRest(a *app.App) *fiber.App {
+	// 注册fiber的中间件和路由
+	middle_ware.InitMiddlewares(a.HttpServer)
+	route.Register(a)
+	return a.HttpServer
+}
+
 func startApiProto(a *app.App) {
 	log.Println("[proto] Starting proto server...")
-	err := protoserver.Start(a)
+	err := proto_server.Start(a)
 	if err != nil {
 		log.Fatalln("proto api can't be started:", err)
 	}
-}
-
-func newApiRest(a *app.App) *fiber.App {
-	// 注册fiber的中间件和路由
-	middleware.InitMiddlewares(a.HttpServer)
-	route.Register(a)
-	return a.HttpServer
 }
