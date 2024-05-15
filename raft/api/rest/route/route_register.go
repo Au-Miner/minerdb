@@ -1,7 +1,7 @@
 package route
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"jdb/jin"
 	"jdb/raft/cluster/consensus"
 	"jdb/raft/starter/app"
 	"jdb/raft/starter/config"
@@ -9,8 +9,9 @@ import (
 
 // ApiCtx 是一个简单的结构，包括路由可能需要操作的工具集合。和app.App结构对应
 type ApiCtx struct {
+	HttpEngine *jin.Engine
+	HttpGroup  *jin.RouterGroup
 	Config     config.Config
-	HttpServer *fiber.App
 	Node       *consensus.Node
 }
 
@@ -18,7 +19,8 @@ type ApiCtx struct {
 func newRouteCtx(app *app.App) *ApiCtx {
 	routeCtx := ApiCtx{
 		Config:     app.Config,
-		HttpServer: app.HttpServer,
+		HttpEngine: app.HttpEngine,
+		HttpGroup:  app.HttpGroup,
 		Node:       app.Node,
 	}
 	return &routeCtx
@@ -26,19 +28,19 @@ func newRouteCtx(app *app.App) *ApiCtx {
 
 // Register 注册路由
 func Register(app *app.App) {
-	routes(app.HttpServer, newRouteCtx(app))
+	routes(app.HttpGroup, newRouteCtx(app))
 }
 
-func routes(app *fiber.App, route *ApiCtx) {
-	app.Get("/store", route.storeGet)
-	app.Get("/store/keys", route.storeGetKeys)
+func routes(httpGroup *jin.RouterGroup, route *ApiCtx) {
+	httpGroup.GET("/store", route.storeGet)
+	httpGroup.GET("/store/keys", route.storeGetKeys)
 
-	app.Post("/store", route.storeSet)
-	app.Delete("/store", route.storeDelete)
+	httpGroup.POST("/store", route.storeSet)
+	// httpGroup.Delete("/store", route.storeDelete)
 
-	app.Get("/store/backup", route.storeBackup)
-	app.Post("/store/restore", route.restoreBackup)
+	httpGroup.GET("/store/backup", route.storeBackup)
+	httpGroup.POST("/store/restore", route.restoreBackup)
 
-	app.Get("/consensus", route.consensusState)
-	app.Get("/healthcheck", route.healthCheck)
+	httpGroup.GET("/consensus", route.consensusState)
+	httpGroup.GET("/healthcheck", route.healthCheck)
 }

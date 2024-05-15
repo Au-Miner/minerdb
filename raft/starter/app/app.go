@@ -1,18 +1,17 @@
 package app
 
 import (
-	"github.com/gofiber/fiber/v2"
-	"github.com/narvikd/fiberparser"
+	"jdb/jin"
 	"jdb/raft/cluster/consensus"
 	"jdb/raft/discover"
 	"jdb/raft/starter/config"
 	"log"
-	"time"
 )
 
 // App 是一个简单的结构，包括应用程序可能需要操作的工具集合
 type App struct {
-	HttpServer *fiber.App
+	HttpEngine *jin.Engine
+	HttpGroup  *jin.RouterGroup
 	Node       *consensus.Node
 	Config     config.Config
 }
@@ -28,18 +27,11 @@ func NewApp(cfg config.Config) *App {
 	if errConsensus != nil {
 		log.Fatalln(errConsensus)
 	}
-	serv := fiber.New(fiber.Config{
-		AppName:           "jdb",
-		EnablePrintRoutes: false,
-		IdleTimeout:       5 * time.Second,
-		WriteTimeout:      10 * time.Second,
-		ErrorHandler: func(ctx *fiber.Ctx, err error) error {
-			return fiberparser.RegisterErrorHandler(ctx, err)
-		},
-		BodyLimit: 200 * 1024 * 1024, // In MB
-	})
+	httpEngine := jin.New()
+	httpGroup := httpEngine.Group("/api")
 	return &App{
-		HttpServer: serv,
+		HttpEngine: httpEngine,
+		HttpGroup:  httpGroup,
 		Node:       node,
 		Config:     cfg,
 	}

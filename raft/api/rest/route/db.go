@@ -1,123 +1,135 @@
 package route
 
 import (
-	"bytes"
 	"encoding/json"
-	"fmt"
-	"github.com/gofiber/fiber/v2"
-	"github.com/narvikd/fiberparser"
-	"io"
+	"jdb/jin"
 	"jdb/raft/api/rest/json_response"
 	"jdb/raft/cluster"
 	"jdb/raft/cluster/consensus/fsm"
 	"strings"
 )
 
-func (a *ApiCtx) storeGet(fiberCtx *fiber.Ctx) error {
+func (a *ApiCtx) storeGet(ctx *jin.Context) {
 	payload := new(fsm.Payload)
-	errParse := fiberparser.ParseAndValidate(fiberCtx, payload)
-	if errParse != nil {
-		return json_response.BadRequest(fiberCtx, errParse.Error())
+
+	err := json.NewDecoder(ctx.Req.Body).Decode(&payload)
+	if err != nil {
+		json_response.BadRequest(ctx, "request body is not valid JSON")
+		return
 	}
 	value, errGet := a.Node.FSM.Get(payload.Key)
 	if errGet != nil {
 		if strings.Contains(strings.ToLower(errGet.Error()), "key not found") {
-			return json_response.NotFound(fiberCtx, "key doesn't exist")
+			json_response.NotFound(ctx, "key doesn't exist")
+			return
 		}
-		return json_response.ServerError(fiberCtx, "couldn't get key from DB: "+errGet.Error())
+		json_response.ServerError(ctx, "couldn't get key from DB: "+errGet.Error())
+		return
 	}
-	return json_response.OK(fiberCtx, "data retrieved successfully", value)
+	json_response.OK(ctx, "data retrieved successfully", value)
 }
 
-func (a *ApiCtx) storeGetKeys(fiberCtx *fiber.Ctx) error {
+func (a *ApiCtx) storeGetKeys(ctx *jin.Context) {
 	keys := a.Node.FSM.GetKeys()
 	if len(keys) <= 0 {
-		return json_response.NotFound(fiberCtx, "no keys in DB")
+		json_response.NotFound(ctx, "no keys in DB")
+		return
 	}
-	return json_response.OK(fiberCtx, "data retrieved successfully", keys)
+	json_response.OK(ctx, "data retrieved successfully", keys)
+	return
 }
 
-func (a *ApiCtx) storeSet(fiberCtx *fiber.Ctx) error {
+func (a *ApiCtx) storeSet(ctx *jin.Context) {
 	const operationType = "SET"
 	payload := new(fsm.Payload)
-	errParse := fiberparser.ParseAndValidate(fiberCtx, payload)
-	if errParse != nil {
-		return json_response.BadRequest(fiberCtx, errParse.Error())
+	err := json.NewDecoder(ctx.Req.Body).Decode(&payload)
+	if err != nil {
+		json_response.BadRequest(ctx, "request body is not valid JSON")
+		return
 	}
 	payload.Operation = operationType
 	errCluster := cluster.Execute(a.Node.Consensus, payload)
 	if errCluster != nil {
-		return json_response.ServerError(fiberCtx, errCluster.Error())
+		json_response.ServerError(ctx, errCluster.Error())
+		return
 	}
-	return json_response.OK(fiberCtx, "data persisted successfully", "")
+	json_response.OK(ctx, "data persisted successfully", "")
 }
 
-func (a *ApiCtx) storeDelete(fiberCtx *fiber.Ctx) error {
+func (a *ApiCtx) storeDelete(ctx *jin.Context) {
 	const operationType = "DELETE"
 	payload := new(fsm.Payload)
-	errParse := fiberparser.ParseAndValidate(fiberCtx, payload)
-	if errParse != nil {
-		return json_response.BadRequest(fiberCtx, errParse.Error())
+	err := json.NewDecoder(ctx.Req.Body).Decode(&payload)
+	if err != nil {
+		json_response.BadRequest(ctx, "request body is not valid JSON")
+		return
 	}
 	payload.Operation = operationType
 	errCluster := cluster.Execute(a.Node.Consensus, payload)
 	if errCluster != nil {
 		if strings.Contains(strings.ToLower(errCluster.Error()), "key not found") {
-			return json_response.NotFound(fiberCtx, "key doesn't exist")
+			json_response.NotFound(ctx, "key doesn't exist")
+			return
 		}
-		return json_response.ServerError(fiberCtx, errCluster.Error())
+		json_response.ServerError(ctx, errCluster.Error())
+		return
 	}
-	return json_response.OK(fiberCtx, "data deleted successfully", "")
+	json_response.OK(ctx, "data deleted successfully", "")
 }
 
-func (a *ApiCtx) storeBackup(fiberCtx *fiber.Ctx) error {
-	backup, err := a.Node.FSM.BackupDB()
-	if err != nil {
-		return json_response.ServerError(fiberCtx, "couldn't backup DB: "+err.Error())
-	}
-	headers := make(map[string]string)
-	headers["Content-Disposition"] = "attachment; filename=backup.db"
-	headers["Content-Type"] = "application/octet-stream"
-	for k, v := range headers {
-		fiberCtx.Response().Header.Set(k, v)
-	}
-	return fiberCtx.SendStream(bytes.NewReader(backup), len(backup))
+func (a *ApiCtx) storeBackup(ctx *jin.Context) {
+	// TODO
+	// backup, err := a.Node.FSM.BackupDB()
+	// if err != nil {
+	// 	json_response.ServerError(ctx, "couldn't backup DB: "+err.Error())
+	// 	return
+	// }
+	// headers := make(map[string]string)
+	// headers["Content-Disposition"] = "attachment; filename=backup.db"
+	// headers["Content-Type"] = "application/octet-stream"
+	// for k, v := range headers {
+	// 	ctx.Response().Header.Set(k, v)
+	// }
+	// ctx.SendStream(bytes.NewReader(backup), len(backup))
 }
 
-func (a *ApiCtx) restoreBackup(fiberCtx *fiber.Ctx) error {
-	const (
-		key           = "backup"
-		operationType = "RESTOREDB"
-	)
-	formFile, errFormFile := fiberCtx.FormFile(key)
-	if errFormFile != nil {
-		errMsg := fmt.Sprintf("couldn't get backup file: %v. Note: Key is '%s'", errFormFile, key)
-		return json_response.ServerError(fiberCtx, errMsg)
-	}
-	multiPartFile, errFileOpen := formFile.Open()
-	if errFileOpen != nil {
-		return json_response.ServerError(fiberCtx, "couldn't open the received backup file: "+errFileOpen.Error())
-	}
-	defer multiPartFile.Close()
-	buf := make([]byte, formFile.Size)
-	_, errRead := multiPartFile.Read(buf)
-	if errRead != nil && errRead != io.EOF {
-		return json_response.ServerError(fiberCtx, "couldn't read the received backup file: "+errRead.Error())
-	}
-	payload := &fsm.Payload{
-		Operation: operationType,
-		Value:     json.RawMessage(buf),
-	}
-	errCluster := cluster.Execute(a.Node.Consensus, payload)
-	if errCluster != nil {
-		return json_response.ServerError(fiberCtx, errCluster.Error())
-	}
-	keys := a.Node.FSM.GetKeys()
-	if len(keys) <= 0 {
-		return json_response.NotFound(fiberCtx, "no keys were found in the DB after the restoring the backup file")
-	}
-	return fiberCtx.Status(fiber.StatusOK).JSON(&fiber.Map{
-		"message": "data restored successfully",
-		"keys":    keys,
-	})
+func (a *ApiCtx) restoreBackup(ctx *jin.Context) {
+	// TODO
+	// const (
+	// 	key           = "backup"
+	// 	operationType = "RESTOREDB"
+	// )
+	// formFile, errFormFile := ctx.FormFile(key)
+	// if errFormFile != nil {
+	// 	errMsg := fmt.Sprintf("couldn't get backup file: %v. Note: Key is '%s'", errFormFile, key)
+	// 	json_response.ServerError(ctx, errMsg)
+	// 	return
+	// }
+	// multiPartFile, errFileOpen := formFile.Open()
+	// if errFileOpen != nil {
+	// 	json_response.ServerError(ctx, "couldn't open the received backup file: "+errFileOpen.Error())
+	// 	return
+	// }
+	// defer multiPartFile.Close()
+	// buf := make([]byte, formFile.Size)
+	// _, errRead := multiPartFile.Read(buf)
+	// if errRead != nil && errRead != io.EOF {
+	// 	json_response.ServerError(ctx, "couldn't read the received backup file: "+errRead.Error())
+	// 	return
+	// }
+	// payload := &fsm.Payload{
+	// 	Operation: operationType,
+	// 	Value:     json.RawMessage(buf),
+	// }
+	// errCluster := cluster.Execute(a.Node.Consensus, payload)
+	// if errCluster != nil {
+	// 	json_response.ServerError(ctx, errCluster.Error())
+	// 	return
+	// }
+	// keys := a.Node.FSM.GetKeys()
+	// if len(keys) <= 0 {
+	// 	json_response.NotFound(ctx, "no keys were found in the DB after the restoring the backup file")
+	// 	return
+	// }
+	// json_response.OK(ctx, "data restored successfully", keys)
 }

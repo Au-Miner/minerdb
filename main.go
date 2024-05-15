@@ -1,7 +1,8 @@
 package main
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"fmt"
+	"jdb/jin"
 	"jdb/raft/api/proto/proto_server"
 	"jdb/raft/api/rest/middle_ware"
 	"jdb/raft/api/rest/route"
@@ -53,17 +54,18 @@ func start(a *app.App) {
 }
 
 func startApiRest(a *app.App) {
-	errListen := newApiRest(a).Listen(a.Config.CurrentNode.ApiAddress)
+	fmt.Println("！！！！！a.Config.CurrentNode.ApiAddress: ", a.Config.CurrentNode.ApiAddress)
+	errListen := newApiRest(a).Run(a.Config.CurrentNode.ApiAddress)
 	if errListen != nil {
 		log.Fatalln("api can't be started:", errListen)
 	}
 }
 
-func newApiRest(a *app.App) *fiber.App {
+func newApiRest(a *app.App) *jin.Engine {
 	// 注册fiber的中间件和路由
-	middle_ware.InitMiddlewares(a.HttpServer)
+	middle_ware.InitMiddlewares(a.HttpGroup)
 	route.Register(a)
-	return a.HttpServer
+	return a.HttpEngine
 }
 
 func startApiProto(a *app.App) {

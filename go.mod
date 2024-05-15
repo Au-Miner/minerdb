@@ -2,20 +2,20 @@ module jdb
 
 go 1.19
 
-require (
+require ( // need modified
 	github.com/bwmarrin/snowflake v0.3.0
 	github.com/google/btree v1.1.2
 	github.com/hashicorp/golang-lru/v2 v2.0.4
 	github.com/valyala/bytebufferpool v1.0.0
 )
 
-require (
+require ( // jdb
 	github.com/gofrs/flock v0.8.1
 	github.com/robfig/cron/v3 v3.0.0
 	golang.org/x/sys v0.11.0 // indirect
 )
 
-require (
+require ( // raft
 	github.com/andybalholm/brotli v1.0.4 // indirect
 	github.com/armon/go-metrics v0.0.0-20190430140413-ec5e00d3c878 // indirect
 	github.com/boltdb/bolt v1.3.1 // indirect
@@ -28,7 +28,6 @@ require (
 	github.com/go-playground/locales v0.14.0 // indirect
 	github.com/go-playground/universal-translator v0.18.0 // indirect
 	github.com/go-playground/validator/v10 v10.11.0 // indirect
-	github.com/gofiber/fiber/v2 v2.42.0
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/glog v1.0.0 // indirect
 	github.com/golang/groupcache v0.0.0-20190702054246-869f871628b6 // indirect
@@ -49,7 +48,6 @@ require (
 	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/miekg/dns v1.1.50 // indirect
 	github.com/narvikd/errorskit v1.0.0
-	github.com/narvikd/fiberparser v1.1.1
 	github.com/narvikd/filekit v1.0.1
 	github.com/narvikd/mdns v0.0.1
 	github.com/philhofer/fwd v1.1.1 // indirect
@@ -70,4 +68,11 @@ require (
 	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f // indirect
 	google.golang.org/grpc v1.53.0
 	google.golang.org/protobuf v1.28.1
+)
+
+require ( // jin
+	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
+	github.com/stretchr/testify v1.9.0
 )
