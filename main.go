@@ -3,15 +3,14 @@ package main
 import (
 	"fmt"
 	"jdb/jin"
-	"jdb/raft/api/proto/proto_server"
+	"jdb/raft/api/jrpc/jrpc_server"
 	"jdb/raft/api/rest/middle_ware"
 	"jdb/raft/api/rest/route"
-	"jdb/raft/discover/mdns_discover"
+	"jdb/raft/discover/zk_discover"
 	"jdb/raft/starter/app"
 	"jdb/raft/starter/config"
 	"log"
 	"runtime"
-	"sync"
 )
 
 func init() {
@@ -25,32 +24,12 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	start(app.NewApp(cfg))
-}
 
-func start(a *app.App) {
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		// 创建fiber的http监听服务（负责解析http请求）
-		startApiRest(a)
-	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		// 创建grpc的监听服务（负责node之间的通信）
-		startApiProto(a)
-	}()
-	if a.Config.Cluster.DiscoverStrategy == config.DiscoverDefault {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			// 创建mdns服务
-			mdns_discover.ServeAndBlock(a.Config.CurrentNode.Host, 8001)
-		}()
-	}
-	wg.Wait()
+	startApiJrpc(cfg)
+	fmt.Println("startApiJrpc结束")
+	a := app.NewApp(cfg)
+	fmt.Println("NewApp结束")
+	startApiRest(a)
 }
 
 func startApiRest(a *app.App) {
@@ -68,10 +47,11 @@ func newApiRest(a *app.App) *jin.Engine {
 	return a.HttpEngine
 }
 
-func startApiProto(a *app.App) {
-	log.Println("[proto] Starting proto server...")
-	err := proto_server.Start(a)
+func startApiJrpc(cfg config.Config) {
+	log.Println("[proto] Starting proto jrpc_server...")
+	err := zk_discover.RegisterNode(cfg.CurrentNode.ID)
 	if err != nil {
-		log.Fatalln("proto api can't be started:", err)
+		log.Fatalln("ips can't be started:", err)
 	}
+	jrpc_server.Start(cfg)
 }

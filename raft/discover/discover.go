@@ -4,7 +4,7 @@ import (
 	"errors"
 	"github.com/hashicorp/raft"
 	"jdb/raft/common/ip_kit"
-	"jdb/raft/discover/mdns_discover"
+	"jdb/raft/discover/zk_discover"
 	"jdb/raft/starter/config"
 )
 
@@ -22,7 +22,7 @@ func SetMode(m string) error {
 func SearchAliveNodes(consensus *raft.Raft, currentNodeID string) []raft.Server {
 	switch mode {
 	case config.DiscoverDefault:
-		return mdns_discover.SearchAliveNodes(consensus, currentNodeID)
+		return zk_discover.SearchAliveNodes(consensus, currentNodeID)
 	default:
 		return []raft.Server{}
 	}
@@ -33,7 +33,7 @@ func SearchAliveNodes(consensus *raft.Raft, currentNodeID string) []raft.Server 
 func SearchLeader(currentNode string) (string, error) {
 	switch mode {
 	case config.DiscoverDefault:
-		return mdns_discover.SearchLeader(currentNode)
+		return zk_discover.SearchLeader(currentNode)
 	default:
 		return "", nil
 	}

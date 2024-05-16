@@ -5,6 +5,14 @@ networks:
     external: false
 
 services:
+  zk:
+    hostname: zookeeper
+    image: zookeeper:3.5.8
+    ports:
+      - "2181:2181"
+    networks:
+      - jdb
+
   bootstrap-node:
     hostname: bootstrap-node
     build:
@@ -15,6 +23,8 @@ services:
     restart: on-failure
     ports:
       - '3001:3001'
+    networks:
+      - jdb
 
   node2:
     hostname: node2
@@ -26,6 +36,8 @@ services:
     restart: on-failure
     ports:
       - '3002:3001'
+    networks:
+      - jdb
 
   node3:
     hostname: node3
@@ -37,6 +49,8 @@ services:
     restart: on-failure
     ports:
       - '3003:3001'
+    networks:
+      - jdb
 
   node4:
     hostname: node4
@@ -48,6 +62,8 @@ services:
     restart: on-failure
     ports:
       - '3004:3001'
+    networks:
+      - jdb
 
   node5:
     hostname: node5
@@ -59,3 +75,5 @@ services:
     restart: on-failure
     ports:
       - '3005:3001'
+    networks:
+      - jdb
