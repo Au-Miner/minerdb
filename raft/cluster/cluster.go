@@ -3,10 +3,11 @@ package cluster
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/hashicorp/raft"
 	"github.com/narvikd/errorskit"
-	"jdb/raft/api/proto"
-	"jdb/raft/api/proto/proto_client"
+	transport_client "jdb/jrpc/rpc_core/transport/client"
+	"jdb/raft/api/jrpc/jrpc_client"
 	"jdb/raft/cluster/consensus/fsm"
 	"jdb/raft/discover"
 	"log"
@@ -59,14 +60,11 @@ func forwardLeaderFuture(consensus *raft.Raft, payload *fsm.Payload) error {
 	if errMarshal != nil {
 		return errorskit.Wrap(errMarshal, "couldn't marshal data to send it to the Leader's DB cluster")
 	}
-	conn, errConn := proto_client.NewConnection(leaderGrpcAddr)
-	if errConn != nil {
-		return errConn
-	}
-	defer conn.Cleanup()
-	_, errTalk := conn.Client.ExecuteOnLeader(conn.Ctx, &proto.ExecuteOnLeaderRequest{
-		Payload: payloadData,
-	})
+	fmt.Println("forwardLeaderFuture创建了jrpc请求地址为：", leaderGrpcAddr)
+	client := transport_client.NewDefaultSocketClientWithAimIp(leaderGrpcAddr)
+	proxy := transport_client.NewRpcClientProxy(client)
+	clientService := proxy.NewProxyInstance(&jrpc_client.ClientService{}).(*jrpc_client.ClientService)
+	errTalk := clientService.ExecuteOnLeader(payloadData)
 	if errTalk != nil {
 		return errorskit.Wrap(errTalk, errGrpcTalkLeader)
 	}
@@ -74,15 +72,11 @@ func forwardLeaderFuture(consensus *raft.Raft, payload *fsm.Payload) error {
 }
 
 func ConsensusJoin(nodeID string, nodeConsensusAddr string, leaderGrpcAddr string) error {
-	conn, errConn := proto_client.NewConnection(leaderGrpcAddr)
-	if errConn != nil {
-		return errConn
-	}
-	defer conn.Cleanup()
-	_, errTalk := conn.Client.ConsensusJoin(conn.Ctx, &proto.ConsensusRequest{
-		NodeID:            nodeID,
-		NodeConsensusAddr: nodeConsensusAddr,
-	})
+	fmt.Println("ConsensusJoin创建了jrpc请求地址为：", leaderGrpcAddr)
+	client := transport_client.NewDefaultSocketClientWithAimIp(leaderGrpcAddr)
+	proxy := transport_client.NewRpcClientProxy(client)
+	clientService := proxy.NewProxyInstance(&jrpc_client.ClientService{}).(*jrpc_client.ClientService)
+	errTalk := clientService.ConsensusJoin(nodeID, nodeConsensusAddr)
 	if errTalk != nil {
 		return errorskit.Wrap(errTalk, errGrpcTalkLeader)
 	}
@@ -90,14 +84,11 @@ func ConsensusJoin(nodeID string, nodeConsensusAddr string, leaderGrpcAddr strin
 }
 
 func ConsensusRemove(nodeID string, leaderGrpcAddr string) error {
-	conn, errConn := proto_client.NewConnection(leaderGrpcAddr)
-	if errConn != nil {
-		return errConn
-	}
-	defer conn.Cleanup()
-	_, errTalk := conn.Client.ConsensusRemove(conn.Ctx, &proto.ConsensusRequest{
-		NodeID: nodeID,
-	})
+	fmt.Println("ConsensusRemove创建了jrpc请求地址为：", leaderGrpcAddr)
+	client := transport_client.NewDefaultSocketClientWithAimIp(leaderGrpcAddr)
+	proxy := transport_client.NewRpcClientProxy(client)
+	clientService := proxy.NewProxyInstance(&jrpc_client.ClientService{}).(*jrpc_client.ClientService)
+	errTalk := clientService.ConsensusRemove(nodeID)
 	if errTalk != nil {
 		return errorskit.Wrap(errTalk, errGrpcTalkLeader)
 	}
@@ -106,12 +97,9 @@ func ConsensusRemove(nodeID string, leaderGrpcAddr string) error {
 
 // RequestNodeReinstall 被调用以防止节点被卡住太久的情况
 func RequestNodeReinstall(nodeGrpcAddr string) error {
-	conn, errConn := proto_client.NewConnection(nodeGrpcAddr)
-	if errConn != nil {
-		return errConn
-	}
-	defer conn.Cleanup()
-
-	_, _ = conn.Client.ReinstallNode(conn.Ctx, &proto.Empty{}) // Ignore the error
-	return nil
+	fmt.Println("RequestNodeReinstall创建了jrpc请求地址为：", nodeGrpcAddr)
+	client := transport_client.NewDefaultSocketClientWithAimIp(nodeGrpcAddr)
+	proxy := transport_client.NewRpcClientProxy(client)
+	clientService := proxy.NewProxyInstance(&jrpc_client.ClientService{}).(*jrpc_client.ClientService)
+	return clientService.ReinstallNode()
 }

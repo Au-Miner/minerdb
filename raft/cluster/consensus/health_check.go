@@ -13,11 +13,11 @@ func (n *Node) IsHealthy() bool {
 	consensusServers := n.Consensus.GetConfiguration().Configuration().Servers
 	stats := n.Consensus.Stats()
 	if len(consensusServers) <= 1 {
-		n.logger.Warn(prefixErr + "only one server in configuration")
+		n.logger.Warn(prefixErr + "only one jrpc_server in configuration")
 		return false
 	}
 	if n.Consensus.State() != raft.Leader && stats["last_contact"] == "never" {
-		n.logger.Warn(prefixErr + "only one server in configuration")
+		n.logger.Warn(prefixErr + "only one jrpc_server in configuration")
 		return false
 	}
 	leaderAddr, leaderID := n.Consensus.LeaderWithID()

@@ -41,6 +41,7 @@ func New() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	fmt.Println("new config的nodeHost：", nodeHost)
 	nodeCfg := NodeCfg{
 		ID:               nodeHost,
 		Host:             nodeHost,
