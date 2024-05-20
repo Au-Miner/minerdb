@@ -54,11 +54,11 @@ func SearchLeader(currentNode string) (string, error) {
 	for _, node := range nodes {
 		grpcAddr := ip_kit.NewAddr(node, config.GrpcPort)
 		fmt.Println("正在请求isLeader！！！")
-		leader := isLeader(grpcAddr)
+		leader, err := isLeader(grpcAddr)
 		fmt.Println("请求isLeader结束！！!")
 		fmt.Printf("判断%v是否为leader：%v\n", leader, grpcAddr)
 		if leader {
-			return node, nil
+			return node, err
 		}
 	}
 	return "", errors.New(ErrLeaderNotFound)
@@ -94,27 +94,37 @@ func createPath(conn *zk.Conn, path string, data []byte) error {
 		if err != nil {
 			return err
 		}
-		var flag int32
+		fmt.Printf("%v在zookeeper中是否存在%v\n", subPath, exists)
 		if i == len(parts) {
-			flag = 1
-		} else {
-			flag = 0
-		}
-		fmt.Printf("正在查找%v是否存在：%v\n", subPath, exists)
-		if !exists {
-			// _, err := conn.Create(subPath, data, 0, zk.WorldACL(zk.PermAll))
-			_, err := conn.Create(subPath, data, flag, zk.WorldACL(zk.PermAll))
-			if err != nil {
-				return err
+			for i := 0; i < 5; i++ {
+				fmt.Printf("暂时存储%v到zookeeper中\n", subPath)
+				_, err := conn.Create(subPath, data, 1, zk.WorldACL(zk.PermAll))
+				if err == zk.ErrNodeExists {
+					fmt.Println("Node already exists, retrying...")
+					time.Sleep(5000 * time.Millisecond)
+					continue
+				} else if err != nil {
+					return err
+				}
+				break
 			}
-			fmt.Println(subPath, "创建成功!")
+		} else {
+			if !exists {
+				fmt.Printf("永久存储%v到zookeeper中\n", subPath)
+				_, err := conn.Create(subPath, data, 0, zk.WorldACL(zk.PermAll))
+				// _, err := conn.Create(subPath, data, 0, zk.WorldACL(zk.PermAll))
+				if err != nil {
+					return err
+				}
+				fmt.Println(subPath, "创建成功!")
+			}
 		}
 	}
 	return nil
 }
 
 // isLeader 请求一个GRPC地址，并返回是否为Leader
-func isLeader(addr string) bool {
+func isLeader(addr string) (bool, error) {
 	fmt.Println("isLeader创建了jrpc请求地址为：", addr)
 	client := transport_client.NewDefaultSocketClientWithAimIp(addr)
 	proxy := transport_client.NewRpcClientProxy(client)

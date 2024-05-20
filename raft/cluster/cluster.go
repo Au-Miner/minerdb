@@ -101,6 +101,5 @@ func RequestNodeReinstall(nodeGrpcAddr string) error {
 	client := transport_client.NewDefaultSocketClientWithAimIp(nodeGrpcAddr)
 	proxy := transport_client.NewRpcClientProxy(client)
 	clientService := proxy.NewProxyInstance(&jrpc_client.ClientService{}).(*jrpc_client.ClientService)
-	clientService.ReinstallNode()
-	return nil
+	return clientService.ReinstallNode()
 }

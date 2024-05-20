@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"time"
 )
 
 var (
@@ -71,17 +72,29 @@ func createPath(conn *zk.Conn, path string, data []byte) error {
 		if err != nil {
 			return err
 		}
-		var flag int32
+		fmt.Printf("%v在zookeeper中是否存在%v\n", subPath, exists)
 		if i == len(parts) {
-			flag = 1
+			for i := 0; i < 5; i++ {
+				fmt.Printf("暂时存储%v到zookeeper中\n", subPath)
+				_, err := conn.Create(subPath, data, 1, zk.WorldACL(zk.PermAll))
+				if err == zk.ErrNodeExists {
+					fmt.Println("Node already exists, retrying...")
+					time.Sleep(5000 * time.Millisecond)
+					continue
+				} else if err != nil {
+					return err
+				}
+				break
+			}
 		} else {
-			flag = 0
-		}
-		// fmt.Printf("%v在zookeeper中是否存在%v，是否为永久节点%v\n", subPath, exists, flag == 0)
-		if !exists {
-			_, err := conn.Create(subPath, data, flag, zk.WorldACL(zk.PermAll))
-			if err != nil {
-				return err
+			if !exists {
+				fmt.Printf("永久存储%v到zookeeper中\n", subPath)
+				_, err := conn.Create(subPath, data, 0, zk.WorldACL(zk.PermAll))
+				// _, err := conn.Create(subPath, data, 0, zk.WorldACL(zk.PermAll))
+				if err != nil {
+					return err
+				}
+				fmt.Println(subPath, "创建成功!")
 			}
 		}
 	}

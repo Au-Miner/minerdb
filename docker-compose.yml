@@ -25,6 +25,8 @@ services:
       - '3001:3001'
     networks:
       - jdb
+    depends_on:
+      - zk
 
   node2:
     hostname: node2
@@ -38,42 +40,51 @@ services:
       - '3002:3001'
     networks:
       - jdb
+    depends_on:
+      - zk
 
-#  node3:
-#    hostname: node3
-#    build:
-#      context: .
-#      dockerfile: Dockerfile
-#    volumes:
-#      - ./data:/app/data
-#    restart: on-failure
-#    ports:
-#      - '3003:3001'
-#    networks:
-#      - jdb
-#
-#  node4:
-#    hostname: node4
-#    build:
-#      context: .
-#      dockerfile: Dockerfile
-#    volumes:
-#      - ./data:/app/data
-#    restart: on-failure
-#    ports:
-#      - '3004:3001'
-#    networks:
-#      - jdb
-#
-#  node5:
-#    hostname: node5
-#    build:
-#      context: .
-#      dockerfile: Dockerfile
-#    volumes:
-#      - ./data:/app/data
-#    restart: on-failure
-#    ports:
-#      - '3005:3001'
-#    networks:
-#      - jdb
+
+  node3:
+    hostname: node3
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./data:/app/data
+    restart: on-failure
+    ports:
+      - '3003:3001'
+    networks:
+      - jdb
+    depends_on:
+      - zk
+
+  node4:
+    hostname: node4
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./data:/app/data
+    restart: on-failure
+    ports:
+      - '3004:3001'
+    networks:
+      - jdb
+    depends_on:
+      - zk
+
+  node5:
+    hostname: node5
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./data:/app/data
+    restart: on-failure
+    ports:
+      - '3005:3001'
+    networks:
+      - jdb
+    depends_on:
+      - zk

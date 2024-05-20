@@ -19,16 +19,17 @@ func (srv *server) ExecuteOnLeader(payloadData []byte) error {
 	return nil
 }
 
-func (srv *server) IsLeader() bool {
+func (srv *server) IsLeader() (bool, error) {
 	fmt.Println("[proto] (IsLeader) request received, processing...")
 	if srv.Node.Consensus == nil {
-		return false
+		return false, errors.New("consensus is not initialized")
 	}
 	fmt.Println("srv.Node.Consensus.State(): ", srv.Node.Consensus.State())
 	fmt.Println("jrpc的IsLeader中的srv.Node.Consensus.State(): ", srv.Node.Consensus.State())
 	is := srv.Node.Consensus.State() == raft.Leader
 	fmt.Println("[proto] (IsLeader) request successful")
-	return is
+	fmt.Println("返回结果为：", is)
+	return is, nil
 }
 
 // ConsensusJoin 增加一个新节点给Raft consensus network

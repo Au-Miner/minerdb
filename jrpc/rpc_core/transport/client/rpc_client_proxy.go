@@ -2,6 +2,7 @@ package transport_client
 
 import (
 	"errors"
+	"fmt"
 	"jdb/jrpc/rpc_common/entities"
 	"reflect"
 )
@@ -57,9 +58,12 @@ func (rcp RpcClientProxy) NewProxyInstance(iClass interface{}) interface{} {
 				reqRPC := entities.RPCdata{Name: rElemType.Name, Args: inArgs}
 
 				// client执行请求reqRPC
-				// fmt.Println("client准备发送reqRPC")
-				rspDecode, _ := rcp.client.SendRequest(reqRPC)
-				// fmt.Println("client接受到了rspDecode")
+				fmt.Println("client准备发送reqRPC")
+				rspDecode, err := rcp.client.SendRequest(reqRPC)
+				fmt.Printf("client接受到了rspDecode: %v, err: %v\n", rspDecode, err)
+				if err != nil {
+					return errorHandler(err)
+				}
 
 				if rspDecode.Err != "" { // remote server error
 					return errorHandler(errors.New(rspDecode.Err))
