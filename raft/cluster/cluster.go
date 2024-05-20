@@ -7,7 +7,7 @@ import (
 	"github.com/hashicorp/raft"
 	"github.com/narvikd/errorskit"
 	"log"
-	"minerdb/jrpc/rpc_core/transport/transport_client"
+	"minerdb/minerrpc/rpc_core/transport/transport_client"
 	"minerdb/raft/api/jrpc/jrpc_client"
 	"minerdb/raft/cluster/consensus/fsm"
 	"minerdb/raft/discover"

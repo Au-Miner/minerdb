@@ -2,14 +2,14 @@ package route
 
 import (
 	"encoding/json"
-	"minerdb/jin"
+	"minerdb/min"
 	"minerdb/raft/api/rest/json_response"
 	"minerdb/raft/cluster"
 	"minerdb/raft/cluster/consensus/fsm"
 	"strings"
 )
 
-func (a *ApiCtx) storeGet(ctx *jin.Context) {
+func (a *ApiCtx) storeGet(ctx *min.Context) {
 	payload := new(fsm.Payload)
 
 	err := json.NewDecoder(ctx.Req.Body).Decode(&payload)
@@ -29,7 +29,7 @@ func (a *ApiCtx) storeGet(ctx *jin.Context) {
 	json_response.OK(ctx, "data retrieved successfully", value)
 }
 
-func (a *ApiCtx) storeGetKeys(ctx *jin.Context) {
+func (a *ApiCtx) storeGetKeys(ctx *min.Context) {
 	keys := a.Node.FSM.GetKeys()
 	if len(keys) <= 0 {
 		json_response.NotFound(ctx, "no keys in DB")
@@ -39,7 +39,7 @@ func (a *ApiCtx) storeGetKeys(ctx *jin.Context) {
 	return
 }
 
-func (a *ApiCtx) storeSet(ctx *jin.Context) {
+func (a *ApiCtx) storeSet(ctx *min.Context) {
 	const operationType = "SET"
 	payload := new(fsm.Payload)
 	err := json.NewDecoder(ctx.Req.Body).Decode(&payload)
@@ -56,7 +56,7 @@ func (a *ApiCtx) storeSet(ctx *jin.Context) {
 	json_response.OK(ctx, "data persisted successfully", "")
 }
 
-func (a *ApiCtx) storeDelete(ctx *jin.Context) {
+func (a *ApiCtx) storeDelete(ctx *min.Context) {
 	const operationType = "DELETE"
 	payload := new(fsm.Payload)
 	err := json.NewDecoder(ctx.Req.Body).Decode(&payload)
@@ -77,7 +77,7 @@ func (a *ApiCtx) storeDelete(ctx *jin.Context) {
 	json_response.OK(ctx, "data deleted successfully", "")
 }
 
-func (a *ApiCtx) storeBackup(ctx *jin.Context) {
+func (a *ApiCtx) storeBackup(ctx *min.Context) {
 	// TODO
 	// backup, err := a.Node.FSM.BackupDB()
 	// if err != nil {
@@ -93,7 +93,7 @@ func (a *ApiCtx) storeBackup(ctx *jin.Context) {
 	// ctx.SendStream(bytes.NewReader(backup), len(backup))
 }
 
-func (a *ApiCtx) restoreBackup(ctx *jin.Context) {
+func (a *ApiCtx) restoreBackup(ctx *min.Context) {
 	// TODO
 	// const (
 	// 	key           = "backup"

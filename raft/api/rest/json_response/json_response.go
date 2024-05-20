@@ -1,22 +1,22 @@
 package json_response
 
 import (
-	"minerdb/jin"
+	"minerdb/min"
 	"net/http"
 )
 
-func OK(ctx *jin.Context, message string, data any) {
+func OK(ctx *min.Context, message string, data any) {
 	ctx.JSON(http.StatusOK, map[string]any{"message": message, "data": data})
 }
 
-func NotFound(ctx *jin.Context, message string) {
+func NotFound(ctx *min.Context, message string) {
 	ctx.Fail(http.StatusNotFound, message)
 }
 
-func BadRequest(ctx *jin.Context, message string) {
+func BadRequest(ctx *min.Context, message string) {
 	ctx.Fail(http.StatusBadRequest, message)
 }
 
-func ServerError(ctx *jin.Context, message string) {
+func ServerError(ctx *min.Context, message string) {
 	ctx.Fail(http.StatusInternalServerError, message)
 }
