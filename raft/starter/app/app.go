@@ -1,11 +1,11 @@
 package app
 
 import (
-	"jdb/jin"
-	"jdb/raft/cluster/consensus"
-	"jdb/raft/discover"
-	"jdb/raft/starter/config"
 	"log"
+	"minerdb/jin"
+	"minerdb/raft/cluster/consensus"
+	"minerdb/raft/discover"
+	"minerdb/raft/starter/config"
 )
 
 // App 是一个简单的结构，包括应用程序可能需要操作的工具集合

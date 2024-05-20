@@ -1,10 +1,10 @@
 package route
 
 import (
-	"jdb/jin"
-	"jdb/raft/cluster/consensus"
-	"jdb/raft/starter/app"
-	"jdb/raft/starter/config"
+	"minerdb/jin"
+	"minerdb/raft/cluster/consensus"
+	"minerdb/raft/starter/app"
+	"minerdb/raft/starter/config"
 )
 
 // ApiCtx 是一个简单的结构，包括路由可能需要操作的工具集合。和app.App结构对应

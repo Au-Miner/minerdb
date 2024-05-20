@@ -2,10 +2,10 @@ package route
 
 import (
 	"encoding/json"
-	"jdb/jin"
-	"jdb/raft/api/rest/json_response"
-	"jdb/raft/cluster"
-	"jdb/raft/cluster/consensus/fsm"
+	"minerdb/jin"
+	"minerdb/raft/api/rest/json_response"
+	"minerdb/raft/cluster"
+	"minerdb/raft/cluster/consensus/fsm"
 	"strings"
 )
 

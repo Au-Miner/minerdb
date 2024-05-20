@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"github.com/hashicorp/raft"
 	"github.com/samuel/go-zookeeper/zk"
-	"jdb/jrpc/rpc_common/constants"
-	"jdb/jrpc/rpc_core/transport/client"
-	"jdb/raft/api/jrpc/jrpc_client"
-	"jdb/raft/common/ip_kit"
-	"jdb/raft/common/resolver"
-	"jdb/raft/starter/config"
+	"minerdb/jrpc/rpc_common/constants"
+	"minerdb/jrpc/rpc_core/transport/transport_client"
+	"minerdb/raft/api/jrpc/jrpc_client"
+	"minerdb/raft/common/ip_kit"
+	"minerdb/raft/common/resolver"
+	"minerdb/raft/starter/config"
 	"os"
 	"os/signal"
 	"strings"
@@ -28,7 +28,7 @@ func init() {
 	if err != nil {
 		panic(fmt.Sprintf("Failed to connect to Zookeeper: %v", err))
 	}
-	fmt.Println("ZK client connected successfully.")
+	fmt.Println("ZK transport_client connected successfully.")
 	cleanupHook()
 }
 
@@ -37,7 +37,7 @@ func cleanupHook() {
 	signal.Notify(c, os.Interrupt)
 	go func() {
 		for range c {
-			fmt.Println("ZK client is closing.")
+			fmt.Println("ZK transport_client is closing.")
 			conn.Close()
 		}
 	}()

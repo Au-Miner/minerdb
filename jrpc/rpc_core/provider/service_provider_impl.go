@@ -2,7 +2,7 @@ package provider
 
 import (
 	"fmt"
-	servicesRegister "jdb/jrpc/rpc_core/services/register"
+	servicesRegister "minerdb/jrpc/rpc_core/services/services_register"
 	"net"
 	"reflect"
 )

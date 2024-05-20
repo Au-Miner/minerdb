@@ -3,9 +3,9 @@ package discover
 import (
 	"errors"
 	"github.com/hashicorp/raft"
-	"jdb/raft/common/ip_kit"
-	"jdb/raft/discover/zk_discover"
-	"jdb/raft/starter/config"
+	"minerdb/raft/common/ip_kit"
+	"minerdb/raft/discover/zk_discover"
+	"minerdb/raft/starter/config"
 )
 
 var mode = config.DiscoverDefault

@@ -1,7 +1,7 @@
 package middle_ware
 
 import (
-	"jdb/jin"
+	"minerdb/jin"
 )
 
 // InitMiddlewares 使用 Fiber 框架来初始化中间件，用于配置跨域资源共享（CORS）和错误恢复

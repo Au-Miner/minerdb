@@ -1,8 +1,8 @@
 package handler
 
 import (
-	"jdb/jrpc/rpc_common/entities"
 	"log"
+	"minerdb/jrpc/rpc_common/entities"
 	"reflect"
 )
 

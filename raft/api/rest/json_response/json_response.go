@@ -1,7 +1,7 @@
 package json_response
 
 import (
-	"jdb/jin"
+	"minerdb/jin"
 	"net/http"
 )
 
