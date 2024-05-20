@@ -133,7 +133,7 @@ func (n *Node) ReinstallNode() {
 	}
 	n.SetReinstallInProgress(true)
 	defer n.SetReinstallInProgress(false)
-	log.Println("node got stuck for too long... Node reinstall in progress...")
+	fmt.Println("node got stuck for too long... Node reinstall in progress...")
 	future := n.Consensus.Shutdown()
 	if future.Error() != nil {
 		errorskit.FatalWrap(future.Error(), errPanic+"couldn't shut down")

@@ -20,16 +20,32 @@ func init() {
 }
 
 func main() {
+	fmt.Println("开始启动！！！")
 	cfg, err := config.New()
 	if err != nil {
 		log.Fatalln(err)
 	}
-
-	startApiJrpc(cfg)
 	fmt.Println("startApiJrpc结束")
 	a := app.NewApp(cfg)
 	fmt.Println("NewApp结束")
+	startApiJrpc(a)
+	// time.Sleep(10 * time.Second)
+	err = a.Node.SetRaft()
+	if err != nil {
+		log.Fatalln(err)
+	}
 	startApiRest(a)
+	select {}
+}
+
+func startApiJrpc(a *app.App) {
+	fmt.Println("[proto] Starting proto jrpc_server...")
+	err := zk_discover.RegisterNode(a.Config.CurrentNode.ID)
+	if err != nil {
+		fmt.Println("a.Config.CurrentNode.ID无法被注册，进程将要退出")
+		log.Fatalln("a.Config.CurrentNode.ID无法被注册", err)
+	}
+	jrpc_server.Start(a)
 }
 
 func startApiRest(a *app.App) {
@@ -45,13 +61,4 @@ func newApiRest(a *app.App) *jin.Engine {
 	middle_ware.InitMiddlewares(a.HttpGroup)
 	route.Register(a)
 	return a.HttpEngine
-}
-
-func startApiJrpc(cfg config.Config) {
-	log.Println("[proto] Starting proto jrpc_server...")
-	err := zk_discover.RegisterNode(cfg.CurrentNode.ID)
-	if err != nil {
-		log.Fatalln("ips can't be started:", err)
-	}
-	jrpc_server.Start(cfg)
 }

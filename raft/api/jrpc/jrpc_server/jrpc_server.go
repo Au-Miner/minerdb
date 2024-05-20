@@ -4,6 +4,7 @@ import (
 	"fmt"
 	transportServer "jdb/jrpc/rpc_core/transport/server"
 	"jdb/raft/cluster/consensus"
+	"jdb/raft/starter/app"
 	"jdb/raft/starter/config"
 )
 
@@ -13,12 +14,15 @@ type server struct {
 }
 
 // Start 启动gRPC jrpc_server
-func Start(cfg config.Config) {
-	fmt.Println("a.Config.CurrentNode.GrpcAddress准备开始注册：", cfg.CurrentNode.GrpcAddress)
-	srv, err := transportServer.NewDefaultSocketServer(cfg.CurrentNode.GrpcAddress)
+func Start(a *app.App) {
+	fmt.Println("a.Config.CurrentNode.GrpcAddress准备开始注册：", a.Config.CurrentNode.GrpcAddress)
+	srv, err := transportServer.NewDefaultSocketServer(a.Config.CurrentNode.GrpcAddress)
 	if err != nil {
 		panic(err)
 	}
-	srv.Register(&server{})
+	srv.Register(&server{
+		Config: a.Config,
+		Node:   a.Node,
+	})
 	go srv.Start()
 }

@@ -47,12 +47,15 @@ func cleanupHook() {
 // 会跳过自身，如果找不到leader，则返回错误，目的是确保不会调用自身的gRPC操作
 func SearchLeader(currentNode string) (string, error) {
 	nodes, errNodes := searchNodes(currentNode)
+	fmt.Println("searchNodes的结果为：", nodes)
 	if errNodes != nil {
 		return "", errNodes
 	}
 	for _, node := range nodes {
 		grpcAddr := ip_kit.NewAddr(node, config.GrpcPort)
+		fmt.Println("正在请求isLeader！！！")
 		leader := isLeader(grpcAddr)
+		fmt.Println("请求isLeader结束！！!")
 		fmt.Printf("判断%v是否为leader：%v\n", leader, grpcAddr)
 		if leader {
 			return node, nil
@@ -87,22 +90,24 @@ func createPath(conn *zk.Conn, path string, data []byte) error {
 	parts := strings.Split(path, "/")
 	for i := 2; i <= len(parts); i++ {
 		subPath := strings.Join(parts[:i], "/")
-		fmt.Println("正在查找subPath是否存在：", subPath)
 		exists, _, err := conn.Exists(subPath)
 		if err != nil {
 			return err
 		}
-		// var flag int32
-		// if i == len(parts) {
-		// 	flag = 1
-		// } else {
-		// 	flag = 0
-		// }
+		var flag int32
+		if i == len(parts) {
+			flag = 1
+		} else {
+			flag = 0
+		}
+		fmt.Printf("正在查找%v是否存在：%v\n", subPath, exists)
 		if !exists {
-			_, err := conn.Create(subPath, data, 0, zk.WorldACL(zk.PermAll))
+			// _, err := conn.Create(subPath, data, 0, zk.WorldACL(zk.PermAll))
+			_, err := conn.Create(subPath, data, flag, zk.WorldACL(zk.PermAll))
 			if err != nil {
 				return err
 			}
+			fmt.Println(subPath, "创建成功!")
 		}
 	}
 	return nil

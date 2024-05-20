@@ -5,7 +5,6 @@ import (
 	"jdb/jdb/common/constrants"
 	"jdb/jdb/common/utils"
 	"jdb/jdb/execution"
-	"log"
 	"os"
 	"testing"
 	"time"
@@ -192,7 +191,7 @@ func TestTTL(t *testing.T) {
 	}
 	ttl, err = db.TTL([]byte("name2"))
 	if err != nil {
-		log.Println(err)
+		fmt.Println(err)
 	}
 	println(ttl.String())
 }

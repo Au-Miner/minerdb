@@ -1,6 +1,7 @@
 package transport_server
 
 import (
+	"fmt"
 	"jdb/jrpc/rpc_core/handler"
 	"jdb/jrpc/rpc_core/provider"
 	"jdb/jrpc/rpc_core/serializer"
@@ -45,7 +46,7 @@ func (ss *SocketServer) Start() {
 		return
 	}
 	for {
-		// log.Printf("等待监听conn")
+		fmt.Println("等待监听conn")
 		conn, err := l.Accept()
 		if err != nil {
 			log.Printf("accept err: %v\n", err)
@@ -57,20 +58,22 @@ func (ss *SocketServer) Start() {
 			nowObjWriter := transportUtils.NewObjectWriter(conn)
 			transportUtils.NewObjectWriter(conn)
 			for {
-				// fmt.Println("server准备接受decReq")
+				fmt.Println("server准备接受decReq")
 				decReq, err := nowObjReader.ReadObject()
 				if err != nil {
 					log.Printf("read err: %v\n", err)
 					return
 				}
-				// fmt.Println("===接收到了decReq: ", decReq)
-				// fmt.Println("===接收到了err: ", err)
+				fmt.Println("===接收到了decReq: ", decReq)
+				fmt.Println("===接收到了err: ", err)
 				f, err := ss.ServicesProvider.GetFunc(decReq.Name)
 				if err != nil {
 					log.Printf("service provider err: %v\n", err)
 					return
 				}
+				fmt.Println("===准备执行Execute")
 				resp := ss.RequestHandler.Execute(decReq, f)
+				fmt.Println("===执行完毕准备发送: ", resp)
 				err = nowObjWriter.WriteObject(resp, ss.Serializer)
 				if err != nil {
 					log.Printf("write err: %v\n", err)

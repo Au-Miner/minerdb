@@ -77,10 +77,6 @@ func New(cfg config.Config) (*Node, error) {
 	if errNode != nil {
 		return nil, errNode
 	}
-	errRaft := n.setRaft()
-	if errRaft != nil {
-		return nil, errRaft
-	}
 	return n, nil
 }
 
@@ -110,7 +106,7 @@ func newNode(cfg config.Config) (*Node, error) {
 }
 
 // setRaft 使用节点的配置初始化并启动一个新的共识实例
-func (n *Node) setRaft() error {
+func (n *Node) SetRaft() error {
 	const (
 		timeout            = 10 * time.Second
 		maxConnectionsPool = 10
@@ -120,22 +116,22 @@ func (n *Node) setRaft() error {
 	)
 	tcpAddr, errAddr := net.ResolveTCPAddr("tcp", n.ConsensusAddress)
 	if errAddr != nil {
-		return errorskit.Wrap(errAddr, "couldn't resolve addr")
+		return errorskit.Wrap(errAddr, "错误！！！couldn't resolve addr")
 	}
 	// 创建transport
 	transport, errTransport := raft.NewTCPTransport(n.ConsensusAddress, tcpAddr, maxConnectionsPool, timeout, os.Stderr)
 	if errTransport != nil {
-		return errorskit.Wrap(errTransport, "couldn't create transport")
+		return errorskit.Wrap(errTransport, "错误！！！couldn't create transport")
 	}
 	// 创建log DB
 	dbStore, errRaftStore := raftboltdb.NewBoltStore(n.consensusDBPath)
 	if errRaftStore != nil {
-		return errorskit.Wrap(errRaftStore, "couldn't create consensus db")
+		return errorskit.Wrap(errRaftStore, "错误！！！couldn't create consensus db")
 	}
 	// 创建snapshot store
 	snaps, errSnapStore := raft.NewFileSnapshotStore(n.snapshotsDir, retainedSnapshots, os.Stderr)
 	if errSnapStore != nil {
-		return errorskit.Wrap(errSnapStore, "couldn't create consensus snapshot storage")
+		return errorskit.Wrap(errSnapStore, "错误！！！couldn't create consensus snapshot storage")
 	}
 	// 设置共识的其他配置
 	nodeID := raft.ServerID(n.ID)
@@ -147,18 +143,20 @@ func (n *Node) setRaft() error {
 	// 创建一个新的Raft instance
 	r, errRaft := raft.NewRaft(cfg, n.FSM, dbStore, dbStore, snaps, transport)
 	if errRaft != nil {
-		return errorskit.Wrap(errRaft, "couldn't create new consensus")
+		return errorskit.Wrap(errRaft, "错误！！！couldn't create new consensus")
 	}
 	n.Consensus = r
 	// 启动consensus process
+	fmt.Println("还没启动时的Consensus.State()为:", n.Consensus.State())
+	fmt.Println("准备启动consensus process")
 	errStartConsensus := n.startConsensus(string(nodeID))
-	fmt.Println("errStartConsensus：", errStartConsensus)
+	fmt.Println("错误！！！errStartConsensus：", errStartConsensus)
 	if errStartConsensus != nil {
 		return errStartConsensus
 	}
 	// 判断集群是否准备就绪
 	errClusterReadiness := n.waitForClusterReadiness()
-	fmt.Println("errClusterReadiness：", errClusterReadiness)
+	fmt.Println("错误！！！errClusterReadiness：", errClusterReadiness)
 	if errClusterReadiness != nil {
 		return errClusterReadiness
 	}
@@ -203,9 +201,10 @@ func (n *Node) startConsensus(currentNodeID string) error {
 	if errSearchLeader == nil {
 		bootstrappingServers = newConsensusServerList(leaderID)
 	}
+	fmt.Println("bootstrappingServers: ", bootstrappingServers)
 	// 只有leader可以启动共识进程
 	future := n.Consensus.BootstrapCluster(raft.Configuration{Servers: bootstrappingServers})
-	fmt.Println("future.Error().Error(): ", future.Error().Error())
+	fmt.Println("bootstrappingServers启动后的结果为: ", future.Error().Error())
 	if future.Error() != nil {
 		if !strings.Contains(future.Error().Error(), "not a voter") {
 			return nil

@@ -1,12 +1,10 @@
 package jrpc_server
 
-import (
-	"log"
-)
+import "fmt"
 
 // ReinstallNode 删除node
 func (srv *server) ReinstallNode() {
-	log.Println("[proto] (Reset Node) request received, processing...")
+	fmt.Println("[proto] (Reset Node) request received, processing...")
 	go srv.Node.ReinstallNode()
-	log.Println("[proto] (Reset Node) request successful")
+	fmt.Println("[proto] (Reset Node) request successful")
 }
