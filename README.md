@@ -1,6 +1,6 @@
 # MinerDB
 
-For Chinese version, see [README_CHI](static/README_CHI.md)
+中文版见 [README_CHI](static/README_CHI.md)
 
 ## What is MinerDB
 MinerDB is a lightweight, simple, and reliable distributed key-value storage engine based on the Raft consensus algorithm. It supports distributed transactions, containerized deployment, service registry, disk storage, etc.
