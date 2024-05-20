@@ -1,7 +1,7 @@
 package route
 
 import (
-	"minerdb/jin"
+	"minerdb/min"
 	"minerdb/raft/cluster/consensus"
 	"minerdb/raft/starter/app"
 	"minerdb/raft/starter/config"
@@ -9,8 +9,8 @@ import (
 
 // ApiCtx 是一个简单的结构，包括路由可能需要操作的工具集合。和app.App结构对应
 type ApiCtx struct {
-	HttpEngine *jin.Engine
-	HttpGroup  *jin.RouterGroup
+	HttpEngine *min.Engine
+	HttpGroup  *min.RouterGroup
 	Config     config.Config
 	Node       *consensus.Node
 }
@@ -31,7 +31,7 @@ func Register(app *app.App) {
 	routes(app.HttpGroup, newRouteCtx(app))
 }
 
-func routes(httpGroup *jin.RouterGroup, route *ApiCtx) {
+func routes(httpGroup *min.RouterGroup, route *ApiCtx) {
 	httpGroup.GET("/store", route.storeGet)
 	httpGroup.GET("/store/keys", route.storeGetKeys)
 

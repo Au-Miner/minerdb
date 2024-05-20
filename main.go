@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
-	"minerdb/jin"
+	"minerdb/min"
 	"minerdb/raft/api/jrpc/jrpc_server"
 	"minerdb/raft/api/rest/middle_ware"
 	"minerdb/raft/api/rest/route"
@@ -56,7 +56,7 @@ func startApiRest(a *app.App) {
 	}
 }
 
-func newApiRest(a *app.App) *jin.Engine {
+func newApiRest(a *app.App) *min.Engine {
 	// 注册fiber的中间件和路由
 	middle_ware.InitMiddlewares(a.HttpGroup)
 	route.Register(a)

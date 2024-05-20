@@ -2,7 +2,7 @@ package app
 
 import (
 	"log"
-	"minerdb/jin"
+	"minerdb/min"
 	"minerdb/raft/cluster/consensus"
 	"minerdb/raft/discover"
 	"minerdb/raft/starter/config"
@@ -10,8 +10,8 @@ import (
 
 // App 是一个简单的结构，包括应用程序可能需要操作的工具集合
 type App struct {
-	HttpEngine *jin.Engine
-	HttpGroup  *jin.RouterGroup
+	HttpEngine *min.Engine
+	HttpGroup  *min.RouterGroup
 	Node       *consensus.Node
 	Config     config.Config
 }
@@ -27,7 +27,7 @@ func NewApp(cfg config.Config) *App {
 	if errConsensus != nil {
 		log.Fatalln(errConsensus)
 	}
-	httpEngine := jin.New()
+	httpEngine := min.New()
 	httpGroup := httpEngine.Group("/api")
 	return &App{
 		HttpEngine: httpEngine,

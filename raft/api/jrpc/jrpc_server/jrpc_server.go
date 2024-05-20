@@ -2,7 +2,7 @@ package jrpc_server
 
 import (
 	"fmt"
-	transportServer "minerdb/jrpc/rpc_core/transport/transport_server"
+	transportServer "minerdb/minerrpc/rpc_core/transport/transport_server"
 	"minerdb/raft/cluster/consensus"
 	"minerdb/raft/starter/app"
 	"minerdb/raft/starter/config"
