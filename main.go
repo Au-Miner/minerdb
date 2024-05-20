@@ -2,20 +2,20 @@ package main
 
 import (
 	"fmt"
-	"jdb/jin"
-	"jdb/raft/api/jrpc/jrpc_server"
-	"jdb/raft/api/rest/middle_ware"
-	"jdb/raft/api/rest/route"
-	"jdb/raft/discover/zk_discover"
-	"jdb/raft/starter/app"
-	"jdb/raft/starter/config"
 	"log"
+	"minerdb/jin"
+	"minerdb/raft/api/jrpc/jrpc_server"
+	"minerdb/raft/api/rest/middle_ware"
+	"minerdb/raft/api/rest/route"
+	"minerdb/raft/discover/zk_discover"
+	"minerdb/raft/starter/app"
+	"minerdb/raft/starter/config"
 	"runtime"
 )
 
 func init() {
 	if runtime.GOOS == "windows" {
-		log.Fatalln("jdb is only compatible with Mac and Linux")
+		log.Fatalln("MinerDB is only compatible with Mac and Linux")
 	}
 }
 

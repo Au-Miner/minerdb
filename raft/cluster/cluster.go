@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"github.com/hashicorp/raft"
 	"github.com/narvikd/errorskit"
-	transport_client "jdb/jrpc/rpc_core/transport/client"
-	"jdb/raft/api/jrpc/jrpc_client"
-	"jdb/raft/cluster/consensus/fsm"
-	"jdb/raft/discover"
 	"log"
+	"minerdb/jrpc/rpc_core/transport/transport_client"
+	"minerdb/raft/api/jrpc/jrpc_client"
+	"minerdb/raft/cluster/consensus/fsm"
+	"minerdb/raft/discover"
 	"time"
 )
 

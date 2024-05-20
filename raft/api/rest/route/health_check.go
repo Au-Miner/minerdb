@@ -2,8 +2,8 @@ package route
 
 import (
 	"fmt"
-	"jdb/jin"
-	"jdb/raft/api/rest/json_response"
+	"minerdb/jin"
+	"minerdb/raft/api/rest/json_response"
 	"strconv"
 )
 

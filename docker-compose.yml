@@ -1,7 +1,7 @@
 version: "1.0"
 
 networks:
-  jdb:
+  miner_db:
     external: false
 
 services:
@@ -11,7 +11,7 @@ services:
     ports:
       - "2181:2181"
     networks:
-      - jdb
+      - miner_db
 
   bootstrap-node:
     hostname: bootstrap-node
@@ -24,7 +24,7 @@ services:
     ports:
       - '3001:3001'
     networks:
-      - jdb
+      - miner_db
     depends_on:
       - zk
 
@@ -39,7 +39,7 @@ services:
     ports:
       - '3002:3001'
     networks:
-      - jdb
+      - miner_db
     depends_on:
       - zk
 
@@ -55,7 +55,7 @@ services:
     ports:
       - '3003:3001'
     networks:
-      - jdb
+      - miner_db
     depends_on:
       - zk
 
@@ -70,7 +70,7 @@ services:
     ports:
       - '3004:3001'
     networks:
-      - jdb
+      - miner_db
     depends_on:
       - zk
 
@@ -85,6 +85,6 @@ services:
     ports:
       - '3005:3001'
     networks:
-      - jdb
+      - miner_db
     depends_on:
       - zk

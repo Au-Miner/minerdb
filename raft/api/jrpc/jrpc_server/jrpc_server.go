@@ -2,10 +2,10 @@ package jrpc_server
 
 import (
 	"fmt"
-	transportServer "jdb/jrpc/rpc_core/transport/server"
-	"jdb/raft/cluster/consensus"
-	"jdb/raft/starter/app"
-	"jdb/raft/starter/config"
+	transportServer "minerdb/jrpc/rpc_core/transport/transport_server"
+	"minerdb/raft/cluster/consensus"
+	"minerdb/raft/starter/app"
+	"minerdb/raft/starter/config"
 )
 
 type server struct {

@@ -3,8 +3,8 @@ package config
 import (
 	"fmt"
 	"github.com/narvikd/errorskit"
-	"jdb/raft/common/ip_kit"
-	"jdb/raft/common/resolver"
+	"minerdb/raft/common/ip_kit"
+	"minerdb/raft/common/resolver"
 	"os"
 	"time"
 )

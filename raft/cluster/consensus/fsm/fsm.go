@@ -6,13 +6,13 @@ import (
 	"github.com/hashicorp/raft"
 	"github.com/narvikd/errorskit"
 	"io"
-	"jdb/jdb/common/constrants"
-	"jdb/jdb/execution"
+	"minerdb/minerdb/common/constrants"
+	"minerdb/minerdb/execution"
 )
 
 // DatabaseFSM 表示数据库的有限状态机实现
 type DatabaseFSM struct {
-	db *execution.JDB
+	db *execution.MinerDB
 }
 
 // snapshot 仅作为raft.FSM的Snapshot方法的实现，没有实际意义
@@ -87,17 +87,17 @@ func (dbFSM DatabaseFSM) Restore(snap io.ReadCloser) error {
 }
 
 // Snapshot 是raft.FSM的interface，用于创建系统的当前状态的快照
-// jdb已经持久化数据，这里不需要执行
+// MinerDB已经持久化数据，这里不需要执行
 func (dbFSM DatabaseFSM) Snapshot() (raft.FSMSnapshot, error) {
 	return snapshot{}, nil
 }
 
-// Persist jdb已经持久化数据，这里不需要执行
+// Persist MinerDB已经持久化数据，这里不需要执行
 func (s snapshot) Persist(_ raft.SnapshotSink) error {
 	return nil
 }
 
-// Release jdb已经持久化数据，这里不需要执行
+// Release MinerDB已经持久化数据，这里不需要执行
 func (s snapshot) Release() {}
 
 // New 创建DatabaseFSM实例
@@ -109,8 +109,8 @@ func New(storageDir string) (*DatabaseFSM, error) {
 	return &DatabaseFSM{db: database}, nil
 }
 
-// 创建JDB数据库
-func newDB(storageDir string) (*execution.JDB, error) {
+// 创建MinerDB数据库
+func newDB(storageDir string) (*execution.MinerDB, error) {
 	options := constrants.DefaultOptions
 	options.DirPath = storageDir
 	return execution.Open(options)

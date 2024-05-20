@@ -5,9 +5,9 @@ import (
 	"github.com/hashicorp/raft"
 	"github.com/narvikd/errorskit"
 	"github.com/narvikd/filekit"
-	"jdb/raft/cluster"
-	"jdb/raft/discover"
 	"log"
+	"minerdb/raft/cluster"
+	"minerdb/raft/discover"
 	"time"
 )
 

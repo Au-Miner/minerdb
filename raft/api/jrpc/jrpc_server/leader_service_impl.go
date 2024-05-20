@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/hashicorp/raft"
-	"jdb/raft/cluster"
+	"minerdb/raft/cluster"
 )
 
 // ExecuteOnLeader 在Raft leader上执行一个cmd

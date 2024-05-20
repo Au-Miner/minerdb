@@ -2,8 +2,8 @@ package consensus
 
 import (
 	"github.com/hashicorp/raft"
-	"jdb/raft/discover"
 	"math"
+	"minerdb/raft/discover"
 	"strconv"
 )
 
