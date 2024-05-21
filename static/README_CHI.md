@@ -8,7 +8,7 @@ MinerDB 是一个轻量级、简单可靠的基于raft的分布式kv存储引擎
 目前MinerDB建议仅供学习和个人项目使用，不建议在生产环境中使用
 
 ## Design Overview
-`TODO`
+![MinerDB.png](MinerDB.png)
 
 ## Main Module
 MinerDB目前主要模块有MinerRPC、Min、Raft、MinerDB组成

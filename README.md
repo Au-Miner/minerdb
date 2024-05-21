@@ -9,7 +9,7 @@ MinerDB is a lightweight, simple, and reliable distributed key-value storage eng
 Currently, MinerDB is recommended for learning and personal projects only and is not recommended for production environments.
 
 ## Design Overview
-`TODO`
+![MinerDB.png](static/MinerDB.png)
 
 ## Main Modules
 MinerDB currently consists of the following main modules: MinerRPC, Min, Raft, and MinerDB.
