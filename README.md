@@ -59,5 +59,31 @@ Supports containerized deployment with docker-compose
 ```sh
 docker-compose up --build -d
 ```
+This will create 1 ZooKeeper container and 5 MinerDB containers, 
+each providing services on ports 3001 to 3005
+
+It can be accessed through any `port` that provides services` http://localhost:<port>/app/store ` Execute a Post request to store data, with the request body in JSON format
+```
+{
+"Key": "key_example",
+"Value": "value example"
+}
+```
+It can also be accessed through any `port` that provides services` http://localhost:<port>/app/store ` Send a Get request to retrieve data, with the request body in JSON format
+```
+{
+"Key": "key_example"
+}
+```
+**Image example:**
+
+Put data:
+
+![put_example.png](static/put_example.png)
+
+Get data:
+
+![get_example.png](static/get_example.png)
+
 ## Thanks
 MinerDB is inspired by etcd, oceanbase, nubedb, rosedb, and waterdb. Many thanks 🙏
