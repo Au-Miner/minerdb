@@ -65,14 +65,14 @@ each providing services on ports 3001 to 3005
 It can be accessed through any `port` that provides services` http://localhost:<port>/app/store ` Execute a Post request to store data, with the request body in JSON format
 ```
 {
-"Key": "key_example",
-"Value": "value example"
+   "Key": "key_example",
+   "Value": "value example"
 }
 ```
 It can also be accessed through any `port` that provides services` http://localhost:<port>/app/store ` Send a Get request to retrieve data, with the request body in JSON format
 ```
 {
-"Key": "key_example"
+   "Key": "key_example"
 }
 ```
 **Image example:**
