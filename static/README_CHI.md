@@ -60,6 +60,25 @@ MinerDB分为Execution层和Storage层
 ```
 docker-compose up --build -d
 ```
+这会创建1个ZooKeeper容器和5个MinerDB容器，5个MinerDB容器分别在3001～3005端口上提供服务
+
+可以通过任何提供服务的端口port `http://localhost:<port>/api/store` 执行Post请求存储数据，请求体为json格式
+```
+{
+    "key": "key_example",
+    "value": "value_example"
+}
+```
+也可以通过任何提供服务的端口port `http://localhost:<port>/api/store` 发送Get请求获取数据，请求体为json格式
+```
+{
+    "key": "key_example"
+}
+```
+图片示例：
+
+![put_example.png](put_example.png)
+![get_example.png](get_example.png)
 
 ## Thanks
 MinerDB受到了etcd、oceanbase、nubedb、rosedb、waterdb的启发，十分感谢🙏
